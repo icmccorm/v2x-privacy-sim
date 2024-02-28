@@ -1,0 +1,5 @@
+simulation_output.tgz
+data
+sandbox.*
+env
+__pycache__
