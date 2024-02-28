@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy as sp
 
-class Location():
+class Positional():
     def __init__(self, max_radius, budget):
         self.max_radius = max_radius
         self.budget = budget
@@ -29,7 +29,7 @@ class Location():
             If the budget is negative
         """
         if self.budget == 0:
-            return (0, 0)
+            return point
         elif self.budget < 0:
             raise ValueError("Budget must be non-negative")
         else:
