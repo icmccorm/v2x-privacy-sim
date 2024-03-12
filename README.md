@@ -43,7 +43,7 @@ To test our tracking framework follow these steps:
 2. Unzip the necessary file. 
 
     ```bash
-    tar xzf simulation_results.tgz
+    tar xzf simulation_output.tgz
     ``` 
     This command will unzip the one simulation output for the 1Hz frequency mentioned above.\
     In particular the extraction process create the following directory tree structure:

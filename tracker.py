@@ -33,7 +33,7 @@ ANGLE_TOLERANCE = 45
 # NAME OF THE FILE CONTAINING ALL THE EAVESDROPPED BSM
 FILE_NAME = 'rsu[{num}]bsm.csv'
 
-def apply_differential_privacy(x, y, dataframe, diff_loc):
+def apply_differential_privacy(x, y, dataframe, diff):
     """Applies laplacian noise to the position of each BSM in the dataframe.
 
     Parameters
@@ -52,7 +52,7 @@ def apply_differential_privacy(x, y, dataframe, diff_loc):
 
     # iterate over each row using tqdm
     for index, row in tqdm(dataframe.iterrows(), total=dataframe.shape[0]):
-        dataframe.at[index, x], dataframe.at[index, y] = diff_loc.apply_noise((row[x], row[y]))    
+        dataframe.at[index, x], dataframe.at[index, y] = diff.apply_noise((row[x], row[y]))
     return dataframe
 
 def mean_pseudonyms_change(path):
@@ -96,7 +96,7 @@ def mean_pseudonyms_change(path):
     logging.info(f'{bcolors.RED}PSEUDONYMS PER VEHICLE (MEAN): {round((pseudonyms_num/vehicles_num), 2)}{bcolors.RESET}')
     return data, pseudonyms
 
-def pseudonym_change_events(dataframe, pseudonyms):
+def pseudonym_change_events(dataframe, pseudonyms, diff_speed):
     """This function perform the following actions:
         - Labeling process of the dataset retrieving the entry and exit events of the pseudonyms.
         - Remove for each pseudonym all the unnecessary BSM between the entry.
@@ -137,7 +137,9 @@ def pseudonym_change_events(dataframe, pseudonyms):
 
     assert previus_dim != actual_dim, 'DATA-FRAME NOT REDUCED'
 
+    dataframe = apply_differential_privacy('heading.x', 'heading.y', dataframe, diff_speed)
     dataframe['angle'] = dataframe.apply(lambda row: heading_to_angle(row['heading.x'], row['heading.y']), axis=1)
+    
     dataframe['speed'] = dataframe.apply(lambda row: np.sqrt(row['speed.x']**2 + row['speed.y']**2), axis=1)
     return dataframe
 
@@ -395,7 +397,7 @@ def filter_dataframe(dataframe, pseudonyms):
     pseudonyms = np.delete(pseudonyms, to_remove_pseudonyms.astype(int))
     return pseudonyms
 
-def analyze(path, freq, dimensions, diff_loc):
+def analyze(path, freq, dimensions, diff_speed, diff_position):
     """This function sequentially call all the function of the python script.
 
     Parameters
@@ -425,10 +427,10 @@ def analyze(path, freq, dimensions, diff_loc):
     dataframe, pseudonyms = mean_pseudonyms_change(path)
 
     logging.info('Getting pseudonym change events...')
-    events = pseudonym_change_events(dataframe, pseudonyms)
+    events = pseudonym_change_events(dataframe, pseudonyms, diff_speed)
 
     logging.info('Applying differential privacy to position data...')
-    events = apply_differential_privacy('pos.x', 'pos.y', events, diff_loc)
+    events = apply_differential_privacy('pos.x', 'pos.y', events, diff_position)
 
     logging.info('Checking for local pseudonym change...')
     beacon_interval = 1/freq
@@ -441,7 +443,7 @@ def analyze(path, freq, dimensions, diff_loc):
     return local_results(results, fn)
 
 
-def main(base_folder, freq, policy, dimensions, diff_loc):
+def main(base_folder, freq, policy, dimensions, diff_speed, diff_position):
     """This function compose the complete path using the base_folder, freq and policy and check if the folder actually exist.
 
     Parameters
@@ -463,7 +465,7 @@ def main(base_folder, freq, policy, dimensions, diff_loc):
     path_if_directory(path)
     logging.info(f'Analyze data in \'{path}\'')
     
-    precision, recall, f1_score = analyze(path, freq, dimensions, diff_loc)
+    precision, recall, f1_score = analyze(path, freq, dimensions, diff_speed, diff_position)
 
     results_file = 'results.csv'
     if os.stat(results_file).st_size == 0:
@@ -499,9 +501,9 @@ if __name__ == "__main__":
     
     parser.add_argument("-pb", "--position-budget", help="Differential privacy budget for position", required=False, type=float, default=0)
     parser.add_argument("-pm", "--position-max", help="Upper bound in meters for offset from differential privacy", required=False, type=float, default=0)
-
+    parser.add_argument("-sb", "--speed-budget", help="Upper bound in meters for offset from differential privacy", required=False, type=float, default=0)
+    parser.add_argument("-sm", "--speed-max", help="Upper bound in meters for offset from differential privacy", required=False, type=float, default=0)
     args = parser.parse_args()
-    
-    diff_loc = diff.Location(args.position_max, args.position_budget)
-
-    main(args.directory, args.freq, args.policy, args.dimensions, diff_loc)
+    diff_position = diff.Positional(args.position_max, args.position_budget)
+    diff_speed = diff.Positional(args.speed_max, args.speed_budget)
+    main(args.directory, args.freq, args.policy, args.dimensions, diff_speed, diff_position)

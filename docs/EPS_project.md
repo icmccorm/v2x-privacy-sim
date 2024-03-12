@@ -59,5 +59,5 @@
 tasks we can implement on the data from the paper; 
 2) 
 
-
-
+1) Noise in broadcast speed - Ian
+- [commit](https://github.com/icmccorm/v2x-privacy-sim/commit/41413edd8a6589fee532a48c35622b5ec440887a)
