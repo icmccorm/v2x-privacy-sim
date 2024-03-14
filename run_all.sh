@@ -9,6 +9,7 @@ do
     for pc in {1..5}
     do
         echo -e "Executing the PTF with frequency $fq and policy $pc -> \"${PCS[$pc]}\"" 
+        # run the next command twice in parallel
         python3 tracker.py -dir results/ -fq $fq -pc $pc
     done
 done

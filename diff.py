@@ -2,9 +2,21 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy as sp
 
+class Arbitrary():
+    def __init__(self, budget, sensitivity):
+        self.budget = budget
+        self.sensitivity = sensitivity
+    def apply_noise(self, pair):
+        if self.budget == 0:
+            return pair
+        elif self.budget < 0:
+            raise ValueError("Budget must be non-negative")
+        else:
+            b = self.sensitivity / self.budget
+            return (pair[0] + np.random.laplace(scale = b), pair[1] + np.random.laplace(scale = b))
+
 class Positional():
-    def __init__(self, max_radius, budget):
-        self.max_radius = max_radius
+    def __init__(self, budget):
         self.budget = budget
     
     def apply_noise(self, point):
@@ -37,8 +49,6 @@ class Positional():
             inner_term = (random_probability - 1) / np.e
             lambert_result = sp.special.lambertw(inner_term, k=-1)
             radius = (-1 / self.budget) * (lambert_result + 1)
-            if self.max_radius is not None:
-                radius = self.max_radius - 1 / radius
             theta = np.random.uniform(low=0, high=2 * np.pi)
             x = radius.real * np.cos(theta)
             y = radius.real * np.sin(theta)
