@@ -45,11 +45,15 @@ class Positional():
         elif self.budget < 0:
             raise ValueError("Budget must be non-negative")
         else:
+            # p (radius)
             random_probability = np.random.uniform()
             inner_term = (random_probability - 1) / np.e
             lambert_result = sp.special.lambertw(inner_term, k=-1)
             radius = (-1 / self.budget) * (lambert_result + 1)
+            # theta (angle)
             theta = np.random.uniform(low=0, high=2 * np.pi)
+            # noise in x 
             x = radius.real * np.cos(theta)
+            # noise in y
             y = radius.real * np.sin(theta)
             return (point[0] + x, point[0] + y)

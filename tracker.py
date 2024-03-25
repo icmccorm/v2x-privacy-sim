@@ -5,6 +5,7 @@ import logging
 import math
 from argparse import ArgumentParser, ArgumentTypeError
 from pathlib import Path
+# differential privacy
 import diff
 import pandas as pd
 import numpy as np
@@ -31,7 +32,7 @@ POS_TOLERANCE = 20
 ANGLE_TOLERANCE = 45
 
 # NAME OF THE FILE CONTAINING ALL THE EAVESDROPPED BSM
-FILE_NAME = 'rsu{num}bsm.csv'
+FILE_NAME = 'rsu[{num}]bsm.csv'
 
 def apply_differential_privacy(x, y, dataframe, diff):
     """Applies laplacian noise to the position of each BSM in the dataframe.
@@ -76,16 +77,14 @@ def mean_pseudonyms_change(path):
     FileNotFoundError
         If no found in path.
     """
-
     data = []
-    for i in range(0, 1):
+    for i in range(0, ANTENNA_NUM):
         file_name = f'./{path}/{FILE_NAME.format(num=i)}'
         if os.path.exists(file_name) and os.path.isfile(file_name):
             data.append(pd.read_csv(file_name))
         else:
             logging.error(f'File {file_name} not found')
             raise FileNotFoundError
-    
     data = pd.concat(data, axis=0, ignore_index=True)
     data.sort_values(by='t', inplace=True)
     pseudonyms = np.array(pd.unique(data['pseudonym'].values))
@@ -94,6 +93,7 @@ def mean_pseudonyms_change(path):
 
     logging.info(f'TOTAL VEHICLES {vehicles_num}, PSEUDONYMS: {pseudonyms_num}')
     logging.info(f'{bcolors.RED}PSEUDONYMS PER VEHICLE (MEAN): {round((pseudonyms_num/vehicles_num), 2)}{bcolors.RESET}')
+
     return data, pseudonyms
 
 def pseudonym_change_events(dataframe, pseudonyms, diff_speed, diff_heading):
@@ -240,7 +240,8 @@ def possible_candidate_found(dataframe, matched_idx, last_seen, results, pseudon
     return dataframe, to_remove_pseudonyms
 
 def local_change(dataframe, pseudonyms, beacon_interval, results, dimensions=False):
-    """This function for each pseudonym of the \'pseudonyms\' list perform the following actions:
+    """
+    This function for each pseudonym of the \'pseudonyms\' list perform the following actions:
         - Retrieve the last pseudonym sighting corresponding to the exit event (x)
         - Filter the data-frame searching for entry events occurred between the time of the current exit event and the bsm sending interval plus a 
             time_tolerance which is 50% of the bsm sending interval
@@ -429,9 +430,14 @@ def analyze(path, freq, dimensions, diff_speed, diff_position, diff_heading):
 
     logging.info('Getting pseudonym change events...')
     events = pseudonym_change_events(dataframe, pseudonyms, diff_speed, diff_heading)
+    original_pos = events[['pos.x','pos.y']].values
 
     logging.info('Applying differential privacy to position data...')
     events = apply_differential_privacy('pos.x', 'pos.y', events, diff_position)
+    
+    # calculate distance between original and noised coordinates
+    new_pos = events[['pos.x','pos.y']].values
+    position_noise = np.linalg.norm(new_pos - original_pos, axis=1)
 
     logging.info('Checking for local pseudonym change...')
     beacon_interval = 1/freq
@@ -441,10 +447,12 @@ def analyze(path, freq, dimensions, diff_speed, diff_position, diff_heading):
     pseudonyms = filter_dataframe(dataframe, pseudonyms)
 
     fn = len(pseudonyms)
-    return local_results(results, fn)
+    precision, recall, f1_score = local_results(results, fn)
+
+    return precision, recall, f1_score, position_noise
 
 
-def main(base_folder, freq, policy, dimensions, diff_speed, diff_position, diff_heading):
+def main(base_folder, freq, policy, dimensions, diff_speed, diff_position, diff_heading, exp_dir_name):
     """This function compose the complete path using the base_folder, freq and policy and check if the folder actually exist.
 
     Parameters
@@ -466,19 +474,33 @@ def main(base_folder, freq, policy, dimensions, diff_speed, diff_position, diff_
     path_if_directory(path)
     logging.info(f'Analyze data in \'{path}\'')
     
-    precision, recall, f1_score = analyze(path, freq, dimensions, diff_speed, diff_position, diff_heading)
-
-    results_file = 'results.csv'
-    if os.stat(results_file).st_size == 0:
-        head = True
-    else:
-        head = False
-
-    with open(results_file, 'a') as f:
-        if head:
-            f.write('fq,pc,prec,recall,f1_score\n')
+    # retrieve classification results
+    precision, recall, f1_score, position_noise = analyze(path, freq, dimensions, diff_speed, diff_position, diff_heading)
+    
+    # write results to output csv
+    results_file = '{}/PB{}_SB{}_HB{}/results.csv'.format(exp_dir_name,
+                                                          diff_position.budget,
+                                                          diff_speed.budget,
+                                                          diff_heading.budget)
+    with open(results_file, 'w') as f:
+        # if head:
+        f.write('fq,pc,prec,recall,f1_score\n')
         f.write(f'{freq}, {policy}, {precision}, {recall}, {f1_score}\n')
-        
+    
+    # write positional noise for each BSM
+    positional_noise_file = '{}/PB{}_SB{}_HB{}/positional_noise.csv'.format(exp_dir_name,
+                                                                            diff_position.budget,
+                                                                            diff_speed.budget,
+                                                                            diff_heading.budget
+                                                                            ) 
+    np.savetxt(positional_noise_file, position_noise, delimiter=",")
+    
+    return None
+
+# exp_name = "{}/PB{}_SB{}_HB{}".format(exp_dir_name, 
+#                                     args.position_budget, 
+#                                     args.speed_budget, 
+#                                     args.heading_budget)
 
 def path_if_directory(s):
     try:
@@ -500,12 +522,34 @@ if __name__ == "__main__":
     parser.add_argument("-pc", "--policy", help="Insert the desired policy", required=True, type=int, choices=[i for i in range(1,6)])
     parser.add_argument("-dim", "--dimensions", help="Consider vehicles dimensions", action="store_true")
     
+    # privacy budget
     parser.add_argument("-pb", "--position-budget", help="Differential privacy budget for position", required=False, type=float, default=0)
     parser.add_argument("-sb", "--speed-budget", help="Differential privacy budget for speed", required=False, type=float, default=0)
     parser.add_argument("-hb", "--heading-budget", help="Differential privacy budget for heading", required=False, type=float, default=0)
 
     args = parser.parse_args()
+
+    # experiment directory 
+    exp_dir_name = "exp_data/Freq{}_Policy{}".format(args.freq, args.policy)
+    # create dir in int and output data if not exists
+    if not os.path.exists(exp_dir_name):
+        os.makedirs(exp_dir_name)
+
+    # experiment name
+    exp_name = "{}/PB{}_SB{}_HB{}".format(exp_dir_name, 
+                                    args.position_budget, 
+                                    args.speed_budget, 
+                                    args.heading_budget)
+    # create dir if not exist
+    if not os.path.exists(exp_name):
+        os.makedirs(exp_name)
+
+    # positional noise
     diff_position = diff.Positional(args.position_budget)
+    # speed noise
     diff_speed = diff.Positional(args.speed_budget)
+    # heading noise
     diff_heading = diff.Arbitrary(args.heading_budget, 2 * np.pi)
-    main(args.directory, args.freq, args.policy, args.dimensions, diff_speed, diff_position, diff_heading)
+    # main
+    main(args.directory, args.freq, args.policy, args.dimensions, 
+         diff_speed, diff_position, diff_heading, exp_dir_name)
