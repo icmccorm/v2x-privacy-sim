@@ -431,13 +431,16 @@ def analyze(path, freq, dimensions, diff_speed, diff_position, diff_heading):
     logging.info('Getting pseudonym change events...')
     events = pseudonym_change_events(dataframe, pseudonyms, diff_speed, diff_heading)
     original_pos = events[['pos.x','pos.y']].values
+    print(original_pos)
 
     logging.info('Applying differential privacy to position data...')
     events = apply_differential_privacy('pos.x', 'pos.y', events, diff_position)
     
     # calculate distance between original and noised coordinates
     new_pos = events[['pos.x','pos.y']].values
+    print(new_pos)
     position_noise = np.linalg.norm(new_pos - original_pos, axis=1)
+    print(np.mean(position_noise))
 
     logging.info('Checking for local pseudonym change...')
     beacon_interval = 1/freq
