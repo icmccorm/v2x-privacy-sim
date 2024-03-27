@@ -1,0 +1,37 @@
+{
+    "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+    "data": {"url": "https://gist.githubusercontent.com/icmccorm/a4e38da24e1465888a66d3f5db42cb9a/raw/1b1fef9da77c682c1888ce6f24d7f02df1fb8afb/data.csv"},
+    "transform":[
+      {"filter": "datum.budget < 0.1"},
+      {"filter": "datum.budget > 0.001"}
+    ],
+    "encoding": {
+      "x": {
+        "field": "budget",
+        "type": "quantitative",
+        "title": "Privacy Budget (ε)"
+      }
+    },
+    "layer": [
+      {
+        "mark": {"type": "errorband", "extent": "ci"},
+        "encoding": {
+          "y": {
+            "field": "diff",
+            "type": "quantitative",
+            "title": "Distance from (0, 0)"
+          }
+        }
+      },
+      {
+        "mark": "line",
+        "encoding": {
+          "y": {
+            "aggregate": "mean",
+            "field": "diff",
+          }
+        }
+      },
+    ]
+  }
+  
