@@ -6,7 +6,7 @@ import math
 from argparse import ArgumentParser, ArgumentTypeError
 from pathlib import Path
 # differential privacy
-import diff
+import diff as diff
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
@@ -34,6 +34,9 @@ ANGLE_TOLERANCE = 45
 # NAME OF THE FILE CONTAINING ALL THE EAVESDROPPED BSM
 FILE_NAME = 'rsu[{num}]bsm.csv'
 
+def disable_progress_bars():
+    return bool(int(os.environ.get('TQDM_DISABLE', 0)))
+
 def apply_differential_privacy(x, y, dataframe, diff):
     """Applies laplacian noise to the position of each BSM in the dataframe.
 
@@ -52,7 +55,7 @@ def apply_differential_privacy(x, y, dataframe, diff):
     """
 
     # iterate over each row using tqdm
-    for index, row in tqdm(dataframe.iterrows(), total=dataframe.shape[0]):
+    for index, row in tqdm(dataframe.iterrows(), total=dataframe.shape[0], disable=disable_progress_bars()):
         dataframe.at[index, x], dataframe.at[index, y] = diff.apply_noise((row[x], row[y]))
     return dataframe
 
@@ -121,7 +124,7 @@ def pseudonym_change_events(dataframe, pseudonyms, diff_speed, diff_heading):
         
     """
     useless_idx = np.empty(0, dtype=int)
-    for i in tqdm(pseudonyms.tolist()):
+    for i in tqdm(pseudonyms.tolist(), disable=disable_progress_bars()):
         pseudonyms_events = dataframe.loc[dataframe['pseudonym'] == i]
         if len(pseudonyms_events) > 1:
             dataframe.loc[pseudonyms_events.iloc[0].name, 'event'] = 'e'
@@ -288,7 +291,7 @@ def local_change(dataframe, pseudonyms, beacon_interval, results, dimensions=Fal
             logging.error('Columns length and width required')
             raise ValueError
     
-    for p in tqdm(pseudonyms.tolist()):
+    for p in tqdm(pseudonyms.tolist(), disable=disable_progress_bars()):
         last_seen = dataframe.loc[(dataframe['pseudonym'] == p) & (dataframe['event'] == 'x')]
 
         if last_seen.empty:
@@ -431,16 +434,16 @@ def analyze(path, freq, dimensions, diff_speed, diff_position, diff_heading):
     logging.info('Getting pseudonym change events...')
     events = pseudonym_change_events(dataframe, pseudonyms, diff_speed, diff_heading)
     original_pos = events[['pos.x','pos.y']].values
-    print(original_pos)
+    logging.debug(f"Original positions:\n----\n{original_pos}\n----\n")
 
     logging.info('Applying differential privacy to position data...')
     events = apply_differential_privacy('pos.x', 'pos.y', events, diff_position)
     
     # calculate distance between original and noised coordinates
     new_pos = events[['pos.x','pos.y']].values
-    print(new_pos)
+    logging.debug(f"New positions:\n----\n{new_pos}\n----\n")
     position_noise = np.linalg.norm(new_pos - original_pos, axis=1)
-    print(np.mean(position_noise))
+    logging.debug(f"Mean positional noise: {np.mean(position_noise)}")
 
     logging.info('Checking for local pseudonym change...')
     beacon_interval = 1/freq
@@ -500,11 +503,6 @@ def main(base_folder, freq, policy, dimensions, diff_speed, diff_position, diff_
     
     return None
 
-# exp_name = "{}/PB{}_SB{}_HB{}".format(exp_dir_name, 
-#                                     args.position_budget, 
-#                                     args.speed_budget, 
-#                                     args.heading_budget)
-
 def path_if_directory(s):
     try:
         p = Path(s)
@@ -517,9 +515,10 @@ def path_if_directory(s):
 
 if __name__ == "__main__":
     FORMAT = '\n[%(asctime)s]:[%(levelname)s] %(message)s'
-    logging.basicConfig(format=FORMAT, level=logging.DEBUG, datefmt='%d/%m/%y %H:%M:%S:%m')
     parser = ArgumentParser()
-    
+
+    parser.add_argument("-q", "--quiet", help="Disable logging", action='store_true')
+    parser.add_argument("-d", "--debug", help="Enable debug logging", action='store_true')
     parser.add_argument("-dir", "--directory", help="Specify the base directory", required=True, type=path_if_directory)
     parser.add_argument("-fq", "--freq", help="Insert the desired frequency", required=True, type=int, choices=[1, 2, 5, 10])
     parser.add_argument("-pc", "--policy", help="Insert the desired policy", required=True, type=int, choices=[i for i in range(1,6)])
@@ -531,7 +530,10 @@ if __name__ == "__main__":
     parser.add_argument("-hb", "--heading-budget", help="Differential privacy budget for heading", required=False, type=float, default=0)
 
     args = parser.parse_args()
-
+    basic_level = logging.DEBUG if args.debug else logging.INFO
+    logging.basicConfig(format=FORMAT, level=basic_level, datefmt='%d/%m/%y %H:%M:%S:%m')
+    logging.disable(logging.ERROR if args.quiet else logging.NOTSET)
+    os.environ["TQDM_DISABLE"] = str(int(args.quiet))
     # experiment directory 
     exp_dir_name = "exp_data/Freq{}_Policy{}".format(args.freq, args.policy)
     # create dir in int and output data if not exists

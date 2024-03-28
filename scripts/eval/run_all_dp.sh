@@ -18,7 +18,7 @@ do
             # run the next command twice in parallel
             RUN_FILE="job_log/FQ${fq}_PC${pc}_PB${pb}"
             echo $RUN_FILE
-            python tracker.py -dir data/ -fq $fq -pc $pc -pb $pb >> $RUN_FILE.log 2>&1
+            python scripts/tracker.py -dir data/ -fq $fq -pc $pc -pb $pb >> $RUN_FILE.log 2>&1
         done
     done
 done

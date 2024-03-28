@@ -4,3 +4,4 @@ sandbox.*
 env
 __pycache__
 temp.csv
+**/*/.ipynb_checkpoints
