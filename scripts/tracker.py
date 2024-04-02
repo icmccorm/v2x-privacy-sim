@@ -56,7 +56,10 @@ def apply_differential_privacy(x, y, dataframe, diff):
 
     # iterate over each row using tqdm
     for index, row in tqdm(dataframe.iterrows(), total=dataframe.shape[0], disable=disable_progress_bars()):
-        dataframe.at[index, x], dataframe.at[index, y] = diff.apply_noise((row[x], row[y]))
+        noise_x, noise_y = diff.sample()
+        dataframe.at[index, x] = dataframe.at[index, x] + noise_x
+        dataframe.at[index, y] = dataframe.at[index, y] + noise_y
+        #dataframe.at[index, x], dataframe.at[index, y] = diff.apply_noise((row[x], row[y]))
     return dataframe
 
 def mean_pseudonyms_change(path):
@@ -442,7 +445,9 @@ def analyze(path, freq, dimensions, diff_speed, diff_position, diff_heading):
     # calculate distance between original and noised coordinates
     new_pos = events[['pos.x','pos.y']].values
     logging.debug(f"New positions:\n----\n{new_pos}\n----\n")
+
     position_noise = np.linalg.norm(new_pos - original_pos, axis=1)
+
     logging.debug(f"Mean positional noise: {np.mean(position_noise)}")
 
     logging.info('Checking for local pseudonym change...')
@@ -456,6 +461,7 @@ def analyze(path, freq, dimensions, diff_speed, diff_position, diff_heading):
     precision, recall, f1_score = local_results(results, fn)
 
     return precision, recall, f1_score, position_noise
+
 
 
 def main(base_folder, freq, policy, dimensions, diff_speed, diff_position, diff_heading, exp_dir_name):

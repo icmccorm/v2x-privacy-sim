@@ -1,4 +1,4 @@
-import diff
+import scripts.diff as diff
 import numpy
 origin = (0, 0)
 
