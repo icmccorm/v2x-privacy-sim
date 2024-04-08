@@ -1,11 +1,15 @@
 #! /bin/bash
 declare -A PCS=( [1]="Periodical" [2]="Disposable" [3]="Distance" [4]="Random" [5]="Car2Car")
 job_log_file () {
-    return "job_log/FQ${1}_PC${2}_PB-pos${3}_PB-speed${4}_PB-heading${5}"
+    echo "job_log/FQ${1}_PC${2}_PB-pos${3}_PB-speed${4}_PB-heading${5}"
 }
+rm -rf job_log
+rm -rf exp_data
+mkdir -p job_log
+mkdir -p exp_data
 for fq in {1..1}
 do
-    for pc in {1..1}
+    for pc in {1..5}
     do  
         for budget in `seq 0 0.0025 0.1`
         do
