@@ -533,15 +533,12 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     basic_level = logging.DEBUG if args.debug else logging.INFO
-    logging.basicConfig(format=FORMAT, level=basic_level, datefmt='%d/%m/%y %H:%M:%S:%m')
-    logging.disable(logging.ERROR if args.quiet else logging.NOTSET)
-    os.environ["TQDM_DISABLE"] = str(int(args.quiet))
+
     # experiment directory 
     exp_dir_name = "exp_data/Freq{}_Policy{}".format(args.freq, args.policy)
     # create dir in int and output data if not exists
     if not os.path.exists(exp_dir_name):
         os.makedirs(exp_dir_name)
-
     # experiment name
     exp_name = "{}/PB{}_SB{}_HB{}".format(exp_dir_name, 
                                     args.position_budget, 
@@ -551,6 +548,9 @@ if __name__ == "__main__":
     if not os.path.exists(exp_name):
         os.makedirs(exp_name)
 
+    logging.basicConfig(filename="{}/run.log".format(exp_name), format=FORMAT, level=basic_level, datefmt='%d/%m/%y %H:%M:%S:%m')
+    logging.disable(logging.ERROR if args.quiet else logging.NOTSET)
+    os.environ["TQDM_DISABLE"] = str(int(args.quiet))
     # positional noise
     diff_position = diff.Positional(args.position_budget)
     # speed noise
