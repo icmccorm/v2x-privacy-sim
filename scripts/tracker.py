@@ -369,12 +369,15 @@ def local_results(results, fn):
     """
     tp = results['tp']
     fp = results['fp']
+    precision = "NA" if tp + fp == 0 else tp/(tp+fp)
+    recall = "NA" if tp + fn == 0 else tp/(tp+fn)
+    f1_score = "NA" if precision == "NA" or recall == "NA" or precision + recall == 0 else 2 * ((precision * recall)/(precision + recall))
 
-    precision = tp/(tp+fp)
-    recall = tp/(tp+fn)
+    f1_score_formatted = f1_score if f1_score == "NA" else '{:.5f}'.format(f1_score)
+    precision_formatted = precision if precision == "NA" else '{:.5f}'.format(precision)
+    recall_formatted = recall if recall == "NA" else '{:.5f}'.format(recall)
 
-    f1_score = 2 * ((precision * recall)/(precision + recall))
-    logging.info(f"{bcolors.GREEN}METRICS -> PRECISION: {'{:.5f}'.format(precision)}, RECALL: {'{:.5f}'.format(recall)}, F1 SCORE: {'{:.5f}'.format(f1_score)}{bcolors.RESET}")
+    logging.info(f"{bcolors.GREEN}METRICS -> PRECISION: {precision_formatted}, RECALL: {recall_formatted}, F1 SCORE: {f1_score_formatted}{bcolors.RESET}")
     return precision, recall, f1_score
 
 def filter_dataframe(dataframe, pseudonyms):
