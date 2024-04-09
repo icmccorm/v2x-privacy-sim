@@ -1,5 +1,5 @@
 eval-dp:
-	printf '%d\n' {1..5} | xargs -i -- /usr/src/v2x/scripts/eval/run_all_dp.sh {}
+	@./scripts/eval/run_all_dp_in_parallel.sh
 eval:
 	@./scripts/eval/run_all.sh
 test:
