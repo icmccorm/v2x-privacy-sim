@@ -464,7 +464,7 @@ def analyze(path, freq, dimensions, diff_speed, diff_position, diff_heading):
 
 
 
-def main(base_folder, freq, policy, dimensions, diff_speed, diff_position, diff_heading, exp_dir_name):
+def main(base_folder, freq, policy, dimensions, diff_speed, diff_position, diff_heading, exp_name):
     """This function compose the complete path using the base_folder, freq and policy and check if the folder actually exist.
 
     Parameters
@@ -490,21 +490,14 @@ def main(base_folder, freq, policy, dimensions, diff_speed, diff_position, diff_
     precision, recall, f1_score, position_noise = analyze(path, freq, dimensions, diff_speed, diff_position, diff_heading)
     
     # write results to output csv
-    results_file = '{}/PB{}_SB{}_HB{}/results.csv'.format(exp_dir_name,
-                                                          diff_position.budget,
-                                                          diff_speed.budget,
-                                                          diff_heading.budget)
+    results_file = '{}/results.csv'.format(exp_name)
     with open(results_file, 'w') as f:
         # if head:
         f.write('fq,pc,prec,recall,f1_score\n')
         f.write(f'{freq}, {policy}, {precision}, {recall}, {f1_score}\n')
     
     # write positional noise for each BSM
-    positional_noise_file = '{}/PB{}_SB{}_HB{}/positional_noise.csv'.format(exp_dir_name,
-                                                                            diff_position.budget,
-                                                                            diff_speed.budget,
-                                                                            diff_heading.budget
-                                                                            ) 
+    positional_noise_file = '{}/positional_noise.csv'.format(exp_name) 
     np.savetxt(positional_noise_file, position_noise, delimiter=",")
     
     return None
@@ -563,4 +556,4 @@ if __name__ == "__main__":
     diff_heading = diff.Arbitrary(args.heading_budget, 2 * np.pi)
     # main
     main(args.directory, args.freq, args.policy, args.dimensions, 
-         diff_speed, diff_position, diff_heading, exp_dir_name)
+         diff_speed, diff_position, diff_heading, exp_name)
