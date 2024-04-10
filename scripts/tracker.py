@@ -491,18 +491,18 @@ def main(base_folder, freq, policy, dimensions, diff_speed, diff_position, diff_
     
     # retrieve classification results
     precision, recall, f1_score, position_noise = analyze(path, freq, dimensions, diff_speed, diff_position, diff_heading)
-    
+    mean = np.mean(position_noise)
+    median = np.median(position_noise)
+    stdev = np.std(position_noise)
+    max_noise = np.max(position_noise)
+    min_noise = np.min(position_noise)
+
     # write results to output csv
     results_file = '{}/results.csv'.format(exp_name)
     with open(results_file, 'w') as f:
         # if head:
-        f.write('fq,pc,prec,recall,f1_score\n')
-        f.write(f'{freq}, {policy}, {precision}, {recall}, {f1_score}\n')
-    
-    # write positional noise for each BSM
-    positional_noise_file = '{}/positional_noise.csv'.format(exp_name) 
-    np.savetxt(positional_noise_file, position_noise, delimiter=",")
-    
+        f.write('fq,pc,prec,recall,f1_score,noise_mean,noise_median,noise_stdev,noise_max,noise_min\n')
+        f.write(f'{freq}, {policy}, {precision}, {recall}, {f1_score}, {mean}, {median}, {stdev}, {max_noise}, {min_noise} \n')
     return None
 
 def path_if_directory(s):
