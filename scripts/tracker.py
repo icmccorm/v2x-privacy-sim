@@ -11,6 +11,24 @@ import pandas as pd
 import numpy as np
 from tqdm import tqdm
 
+# position_budget,speed_budget,heading_budget,fq,pc,prec,recall,f1_score,noise_mean,noise_median,noise_stdev,noise_max,noise_min
+# a list of the strings above
+CSV_HEADERS = [
+    'position_budget',
+    'speed_budget', 
+    'heading_budget',
+    'fq',
+    'pc',
+    'prec',
+    'recall',
+    'f1_score',
+    'noise_mean',
+    'noise_median',
+    'noise_stdev',
+    'noise_max',
+    'noise_min'
+]
+
 class bcolors:
     HEADER = '\033[95m'
     BLUE = '\033[94m'
@@ -497,12 +515,26 @@ def main(base_folder, freq, policy, dimensions, diff_speed, diff_position, diff_
     max_noise = np.max(position_noise)
     min_noise = np.min(position_noise)
 
-    # write results to output csv
+    results = [
+        diff_speed.budget,
+        diff_position.budget,
+        diff_heading.budget,
+        freq,
+        policy,
+        precision,
+        recall,
+        f1_score,
+        mean,
+        median,
+        stdev,
+        max_noise,
+        min_noise
+    ]
     results_file = '{}/results.csv'.format(exp_name)
     with open(results_file, 'w') as f:
-        # if head:
-        f.write('fq,pc,prec,recall,f1_score,noise_mean,noise_median,noise_stdev,noise_max,noise_min\n')
-        f.write(f'{freq}, {policy}, {precision}, {recall}, {f1_score}, {mean}, {median}, {stdev}, {max_noise}, {min_noise} \n')
+        f.write(f'{','.join(CSV_HEADERS)}\n')
+        f.write(f'{','.join(results)}\n')
+
     return None
 
 def path_if_directory(s):
