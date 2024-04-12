@@ -530,11 +530,9 @@ def main(base_folder, freq, policy, dimensions, diff_speed, diff_position, diff_
         max_noise,
         min_noise
     ]
-    results_file = '{}/results.csv'.format(exp_name)
-    with open(results_file, 'w') as f:
-        f.write(f'{','.join(CSV_HEADERS)}\n')
-        f.write(f'{','.join(results)}\n')
-
+    results_file = '{}/run.csv'.format(exp_name)
+    with open(results_file, 'w') as file:
+        file.write(",".join([str(r) for r in results]) + "\n")
     return None
 
 def path_if_directory(s):
