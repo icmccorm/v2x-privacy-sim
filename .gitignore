@@ -4,3 +4,5 @@ sandbox.*
 env
 __pycache__
 temp.csv
+job_log/*
+exp_data/*

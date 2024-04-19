@@ -12,13 +12,13 @@ for fq in {1..1}
 do
     for pc in {1..1}
     do  
-        for pb in `seq 0 0.0025 0.1`
+        for hb in `seq 0 0.0025 0.1`
         do
-            echo -e "Executing the PTF with frequency $fq and policy $pc -> \"${PCS[$pc]}\" pb -> $pb" 
+            echo -e "Executing the PTF with frequency $fq and policy $pc -> \"${PCS[$pc]}\" hb -> $hb" 
             # run the next command twice in parallel
-            RUN_FILE="job_log/FQ${fq}_PC${pc}_PB${pb}"
+            RUN_FILE="job_log/FQ${fq}_PC${pc}_HB${hb}"
             echo $RUN_FILE
-            python tracker.py -dir data/ -fq $fq -pc $pc -pb $pb >> $RUN_FILE.log 2>&1
+            python tracker.py -dir data/ -fq $fq -pc $pc -hb $hb >> $RUN_FILE.log 2>&1
         done
     done
 done
