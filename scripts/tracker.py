@@ -450,28 +450,18 @@ def analyze(path, freq, dimensions, diff_speed, diff_position, diff_heading):
     logging.info('Getting pseudonym change events...')
     events = pseudonym_change_events(dataframe, pseudonyms, diff_speed, diff_heading)
     original_pos = events[['pos.x','pos.y']].values
-<<<<<<< HEAD:tracker.py
-    # print(original_pos)
-=======
     logging.debug(f"Original positions:\n----\n{original_pos}\n----\n")
->>>>>>> 68f3dc914696c65b381aeb2e3210888c3f61282a:scripts/tracker.py
 
     logging.info('Applying differential privacy to position data...')
     events = apply_differential_privacy('pos.x', 'pos.y', events, diff_position)
     
     # calculate distance between original and noised coordinates
     new_pos = events[['pos.x','pos.y']].values
-<<<<<<< HEAD:tracker.py
-    # print(new_pos)
-    position_noise = np.linalg.norm(new_pos - original_pos, axis=1)
-    # print(np.mean(position_noise))
-=======
     logging.debug(f"New positions:\n----\n{new_pos}\n----\n")
 
     position_noise = np.linalg.norm(new_pos - original_pos, axis=1)
 
     logging.debug(f"Mean positional noise: {np.mean(position_noise)}")
->>>>>>> 68f3dc914696c65b381aeb2e3210888c3f61282a:scripts/tracker.py
 
     logging.info('Checking for local pseudonym change...')
     beacon_interval = 1/freq
