@@ -6,10 +6,28 @@ import math
 from argparse import ArgumentParser, ArgumentTypeError
 from pathlib import Path
 # differential privacy
-import diff
+import diff as diff
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
+
+# position_budget,speed_budget,heading_budget,fq,pc,prec,recall,f1_score,noise_mean,noise_median,noise_stdev,noise_max,noise_min
+# a list of the strings above
+CSV_HEADERS = [
+    'position_budget',
+    'speed_budget', 
+    'heading_budget',
+    'fq',
+    'pc',
+    'prec',
+    'recall',
+    'f1_score',
+    'noise_mean',
+    'noise_median',
+    'noise_stdev',
+    'noise_max',
+    'noise_min'
+]
 
 class bcolors:
     HEADER = '\033[95m'
@@ -34,6 +52,9 @@ ANGLE_TOLERANCE = 45
 # NAME OF THE FILE CONTAINING ALL THE EAVESDROPPED BSM
 FILE_NAME = 'rsu[{num}]bsm.csv'
 
+def disable_progress_bars():
+    return bool(int(os.environ.get('TQDM_DISABLE', 0)))
+
 def apply_differential_privacy(x, y, dataframe, diff):
     """Applies laplacian noise to the position of each BSM in the dataframe.
 
@@ -52,8 +73,11 @@ def apply_differential_privacy(x, y, dataframe, diff):
     """
 
     # iterate over each row using tqdm
-    for index, row in tqdm(dataframe.iterrows(), total=dataframe.shape[0]):
-        dataframe.at[index, x], dataframe.at[index, y] = diff.apply_noise((row[x], row[y]))
+    for index, row in tqdm(dataframe.iterrows(), total=dataframe.shape[0], disable=disable_progress_bars()):
+        noise_x, noise_y = diff.sample()
+        dataframe.at[index, x] = dataframe.at[index, x] + noise_x
+        dataframe.at[index, y] = dataframe.at[index, y] + noise_y
+        #dataframe.at[index, x], dataframe.at[index, y] = diff.apply_noise((row[x], row[y]))
     return dataframe
 
 def mean_pseudonyms_change(path):
@@ -121,7 +145,7 @@ def pseudonym_change_events(dataframe, pseudonyms, diff_speed, diff_heading):
         
     """
     useless_idx = np.empty(0, dtype=int)
-    for i in tqdm(pseudonyms.tolist()):
+    for i in tqdm(pseudonyms.tolist(), disable=disable_progress_bars()):
         pseudonyms_events = dataframe.loc[dataframe['pseudonym'] == i]
         if len(pseudonyms_events) > 1:
             dataframe.loc[pseudonyms_events.iloc[0].name, 'event'] = 'e'
@@ -288,7 +312,7 @@ def local_change(dataframe, pseudonyms, beacon_interval, results, dimensions=Fal
             logging.error('Columns length and width required')
             raise ValueError
     
-    for p in tqdm(pseudonyms.tolist()):
+    for p in tqdm(pseudonyms.tolist(), disable=disable_progress_bars()):
         last_seen = dataframe.loc[(dataframe['pseudonym'] == p) & (dataframe['event'] == 'x')]
 
         if last_seen.empty:
@@ -363,12 +387,15 @@ def local_results(results, fn):
     """
     tp = results['tp']
     fp = results['fp']
+    precision = "NA" if tp + fp == 0 else tp/(tp+fp)
+    recall = "NA" if tp + fn == 0 else tp/(tp+fn)
+    f1_score = "NA" if precision == "NA" or recall == "NA" or precision + recall == 0 else 2 * ((precision * recall)/(precision + recall))
 
-    precision = tp/(tp+fp)
-    recall = tp/(tp+fn)
+    f1_score_formatted = f1_score if f1_score == "NA" else '{:.5f}'.format(f1_score)
+    precision_formatted = precision if precision == "NA" else '{:.5f}'.format(precision)
+    recall_formatted = recall if recall == "NA" else '{:.5f}'.format(recall)
 
-    f1_score = 2 * ((precision * recall)/(precision + recall))
-    logging.info(f"{bcolors.GREEN}METRICS -> PRECISION: {'{:.5f}'.format(precision)}, RECALL: {'{:.5f}'.format(recall)}, F1 SCORE: {'{:.5f}'.format(f1_score)}{bcolors.RESET}")
+    logging.info(f"{bcolors.GREEN}METRICS -> PRECISION: {precision_formatted}, RECALL: {recall_formatted}, F1 SCORE: {f1_score_formatted}{bcolors.RESET}")
     return precision, recall, f1_score
 
 def filter_dataframe(dataframe, pseudonyms):
@@ -431,16 +458,28 @@ def analyze(path, freq, dimensions, diff_speed, diff_position, diff_heading):
     logging.info('Getting pseudonym change events...')
     events = pseudonym_change_events(dataframe, pseudonyms, diff_speed, diff_heading)
     original_pos = events[['pos.x','pos.y']].values
+<<<<<<< HEAD:tracker.py
     # print(original_pos)
+=======
+    logging.debug(f"Original positions:\n----\n{original_pos}\n----\n")
+>>>>>>> 68f3dc914696c65b381aeb2e3210888c3f61282a:scripts/tracker.py
 
     logging.info('Applying differential privacy to position data...')
     events = apply_differential_privacy('pos.x', 'pos.y', events, diff_position)
     
     # calculate distance between original and noised coordinates
     new_pos = events[['pos.x','pos.y']].values
+<<<<<<< HEAD:tracker.py
     # print(new_pos)
     position_noise = np.linalg.norm(new_pos - original_pos, axis=1)
     # print(np.mean(position_noise))
+=======
+    logging.debug(f"New positions:\n----\n{new_pos}\n----\n")
+
+    position_noise = np.linalg.norm(new_pos - original_pos, axis=1)
+
+    logging.debug(f"Mean positional noise: {np.mean(position_noise)}")
+>>>>>>> 68f3dc914696c65b381aeb2e3210888c3f61282a:scripts/tracker.py
 
     logging.info('Checking for local pseudonym change...')
     beacon_interval = 1/freq
@@ -455,7 +494,8 @@ def analyze(path, freq, dimensions, diff_speed, diff_position, diff_heading):
     return precision, recall, f1_score, position_noise
 
 
-def main(base_folder, freq, policy, dimensions, diff_speed, diff_position, diff_heading, exp_dir_name):
+
+def main(base_folder, freq, policy, dimensions, diff_speed, diff_position, diff_heading, exp_name):
     """This function compose the complete path using the base_folder, freq and policy and check if the folder actually exist.
 
     Parameters
@@ -479,31 +519,31 @@ def main(base_folder, freq, policy, dimensions, diff_speed, diff_position, diff_
     
     # retrieve classification results
     precision, recall, f1_score, position_noise = analyze(path, freq, dimensions, diff_speed, diff_position, diff_heading)
-    
-    # write results to output csv
-    results_file = '{}/PB{}_SB{}_HB{}/results.csv'.format(exp_dir_name,
-                                                          diff_position.budget,
-                                                          diff_speed.budget,
-                                                          diff_heading.budget)
-    with open(results_file, 'w') as f:
-        # if head:
-        f.write('fq,pc,prec,recall,f1_score\n')
-        f.write(f'{freq}, {policy}, {precision}, {recall}, {f1_score}\n')
-    
-    # write positional noise for each BSM
-    positional_noise_file = '{}/PB{}_SB{}_HB{}/positional_noise.csv'.format(exp_dir_name,
-                                                                            diff_position.budget,
-                                                                            diff_speed.budget,
-                                                                            diff_heading.budget
-                                                                            ) 
-    np.savetxt(positional_noise_file, position_noise, delimiter=",")
-    
-    return None
+    mean = np.mean(position_noise)
+    median = np.median(position_noise)
+    stdev = np.std(position_noise)
+    max_noise = np.max(position_noise)
+    min_noise = np.min(position_noise)
 
-# exp_name = "{}/PB{}_SB{}_HB{}".format(exp_dir_name, 
-#                                     args.position_budget, 
-#                                     args.speed_budget, 
-#                                     args.heading_budget)
+    results = [
+        diff_speed.budget,
+        diff_position.budget,
+        diff_heading.budget,
+        freq,
+        policy,
+        precision,
+        recall,
+        f1_score,
+        mean,
+        median,
+        stdev,
+        max_noise,
+        min_noise
+    ]
+    results_file = '{}/run.csv'.format(exp_name)
+    with open(results_file, 'w') as file:
+        file.write(",".join([str(r) for r in results]) + "\n")
+    return None
 
 def path_if_directory(s):
     try:
@@ -517,9 +557,10 @@ def path_if_directory(s):
 
 if __name__ == "__main__":
     FORMAT = '\n[%(asctime)s]:[%(levelname)s] %(message)s'
-    logging.basicConfig(format=FORMAT, level=logging.DEBUG, datefmt='%d/%m/%y %H:%M:%S:%m')
     parser = ArgumentParser()
-    
+
+    parser.add_argument("-q", "--quiet", help="Disable logging", action='store_true')
+    parser.add_argument("-d", "--debug", help="Enable debug logging", action='store_true')
     parser.add_argument("-dir", "--directory", help="Specify the base directory", required=True, type=path_if_directory)
     parser.add_argument("-fq", "--freq", help="Insert the desired frequency", required=True, type=int, choices=[1, 2, 5, 10])
     parser.add_argument("-pc", "--policy", help="Insert the desired policy", required=True, type=int, choices=[i for i in range(1,6)])
@@ -531,13 +572,13 @@ if __name__ == "__main__":
     parser.add_argument("-hb", "--heading-budget", help="Differential privacy budget for heading", required=False, type=float, default=0)
 
     args = parser.parse_args()
+    basic_level = logging.DEBUG if args.debug else logging.INFO
 
     # experiment directory 
     exp_dir_name = "exp_data/Freq{}_Policy{}".format(args.freq, args.policy)
     # create dir in int and output data if not exists
     if not os.path.exists(exp_dir_name):
         os.makedirs(exp_dir_name)
-
     # experiment name
     exp_name = "{}/PB{}_SB{}_HB{}".format(exp_dir_name, 
                                     args.position_budget, 
@@ -547,6 +588,9 @@ if __name__ == "__main__":
     if not os.path.exists(exp_name):
         os.makedirs(exp_name)
 
+    logging.basicConfig(filename="{}/run.log".format(exp_name), format=FORMAT, level=basic_level, datefmt='%d/%m/%y %H:%M:%S:%m')
+    logging.disable(logging.ERROR if args.quiet else logging.NOTSET)
+    os.environ["TQDM_DISABLE"] = str(int(args.quiet))
     # positional noise
     diff_position = diff.Positional(args.position_budget)
     # speed noise
@@ -555,4 +599,4 @@ if __name__ == "__main__":
     diff_heading = diff.Arbitrary(args.heading_budget, 2 * np.pi)
     # main
     main(args.directory, args.freq, args.policy, args.dimensions, 
-         diff_speed, diff_position, diff_heading, exp_dir_name)
+         diff_speed, diff_position, diff_heading, exp_name)

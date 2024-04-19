@@ -6,27 +6,24 @@ class Arbitrary():
     def __init__(self, budget, sensitivity):
         self.budget = budget
         self.sensitivity = sensitivity
-    def apply_noise(self, pair):
+    def sample(self):
         if self.budget == 0:
-            return pair
+            return (0, 0)
         elif self.budget < 0:
             raise ValueError("Budget must be non-negative")
         else:
             b = self.sensitivity / self.budget
-            return (pair[0] + np.random.laplace(scale = b), pair[1] + np.random.laplace(scale = b))
+            return (np.random.laplace(scale = b), np.random.laplace(scale = b))
 
 class Positional():
     def __init__(self, budget):
         self.budget = budget
-    
-    def apply_noise(self, point):
+
+    def sample(self):
         """Applies laplacian noise to a cartesian coordinate for a given privacy budget.
 
         Parameters
         ----------
-        point : (float, float), required
-            The cartesian coordinate 
-
         budget : float, required
             The budget of the laplacian noise
             
@@ -41,7 +38,7 @@ class Positional():
             If the budget is negative
         """
         if self.budget == 0:
-            return point
+            return (0, 0)
         elif self.budget < 0:
             raise ValueError("Budget must be non-negative")
         else:
@@ -56,4 +53,4 @@ class Positional():
             x = radius.real * np.cos(theta)
             # noise in y
             y = radius.real * np.sin(theta)
-            return (point[0] + x, point[0] + y)
+            return (x, y)
