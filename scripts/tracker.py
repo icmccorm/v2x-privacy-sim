@@ -11,8 +11,6 @@ import pandas as pd
 import numpy as np
 from tqdm import tqdm
 
-# position_budget,speed_budget,heading_budget,fq,pc,prec,recall,f1_score,noise_mean,noise_median,noise_stdev,noise_max,noise_min
-# a list of the strings above
 CSV_HEADERS = [
     'position_budget',
     'speed_budget', 
@@ -21,12 +19,7 @@ CSV_HEADERS = [
     'pc',
     'prec',
     'recall',
-    'f1_score',
-    'noise_mean',
-    'noise_median',
-    'noise_stdev',
-    'noise_max',
-    'noise_min'
+    'f1_score'
 ]
 
 class bcolors:
@@ -77,7 +70,6 @@ def apply_differential_privacy(x, y, dataframe, diff):
         noise_x, noise_y = diff.sample()
         dataframe.at[index, x] = dataframe.at[index, x] + noise_x
         dataframe.at[index, y] = dataframe.at[index, y] + noise_y
-        #dataframe.at[index, x], dataframe.at[index, y] = diff.apply_noise((row[x], row[y]))
     return dataframe
 
 def mean_pseudonyms_change(path):
@@ -595,8 +587,8 @@ if __name__ == "__main__":
     diff_position = diff.Positional(args.position_budget)
     # speed noise
     diff_speed = diff.Positional(args.speed_budget)
-    # heading noise
-    diff_heading = diff.Arbitrary(args.heading_budget, 2 * np.pi)
+    diff_heading = diff.Arbitrary(args.heading_budget, 2 * ANGLE_TOLERANCE, lambda a: (np.clip(a[0],0, 180), np.clip(a[1], 0, 180)))
     # main
     main(args.directory, args.freq, args.policy, args.dimensions, 
          diff_speed, diff_position, diff_heading, exp_name)
+    

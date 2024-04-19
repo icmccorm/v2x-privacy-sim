@@ -3,9 +3,10 @@ import matplotlib.pyplot as plt
 import scipy as sp
 
 class Arbitrary():
-    def __init__(self, budget, sensitivity):
+    def __init__(self, budget, sensitivity, filter = lambda a: a):
         self.budget = budget
         self.sensitivity = sensitivity
+        self.filter = filter
     def sample(self):
         if self.budget == 0:
             return (0, 0)
@@ -13,12 +14,13 @@ class Arbitrary():
             raise ValueError("Budget must be non-negative")
         else:
             b = self.sensitivity / self.budget
-            return (np.random.laplace(scale = b), np.random.laplace(scale = b))
+            return self.filter((np.random.laplace(scale = b), np.random.laplace(scale = b)))
 
 class Positional():
     def __init__(self, budget):
         self.budget = budget
-
+        if self.budget < 0:
+            raise ValueError("Budget must be non-negative")
     def sample(self):
         """Applies laplacian noise to a cartesian coordinate for a given privacy budget.
 
@@ -37,20 +39,13 @@ class Positional():
         ValueError
             If the budget is negative
         """
-        if self.budget == 0:
+
+        if self.budget == 0: 
             return (0, 0)
-        elif self.budget < 0:
-            raise ValueError("Budget must be non-negative")
         else:
-            # p (radius)
-            random_probability = np.random.uniform()
-            inner_term = (random_probability - 1) / np.e
-            lambert_result = sp.special.lambertw(inner_term, k=-1)
-            radius = (-1 / self.budget) * (lambert_result + 1)
-            # theta (angle)
-            theta = np.random.uniform(low=0, high=2 * np.pi)
-            # noise in x 
-            x = radius.real * np.cos(theta)
+            r =  (-1 / self.budget) * (sp.special.lambertw((np.random.uniform() - 1) / np.e, k=-1) + 1)
+            theta = np.random.uniform() * 2 * np.pi
+            x = r.real * np.cos(theta)
             # noise in y
-            y = radius.real * np.sin(theta)
+            y = r.real * np.sin(theta)
             return (x, y)
