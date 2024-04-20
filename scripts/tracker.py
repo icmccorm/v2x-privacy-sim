@@ -75,9 +75,14 @@ def apply_differential_privacy(x, y, dataframe, diff):
     # iterate over each row using tqdm
     for index, row in tqdm(dataframe.iterrows(), total=dataframe.shape[0], disable=disable_progress_bars()):
         noise_x, noise_y = diff.sample()
+        # original points 
+        dataframe.at[index, "{}_orig".format(x)] = dataframe.at[index, x] + noise_x
+        dataframe.at[index, "{}_orig".format(y)] = dataframe.at[index, y] + noise_y
+        # noise apply
         dataframe.at[index, x] = dataframe.at[index, x] + noise_x
         dataframe.at[index, y] = dataframe.at[index, y] + noise_y
         #dataframe.at[index, x], dataframe.at[index, y] = diff.apply_noise((row[x], row[y]))
+        
     return dataframe
 
 def mean_pseudonyms_change(path):
@@ -458,28 +463,21 @@ def analyze(path, freq, dimensions, diff_speed, diff_position, diff_heading):
     logging.info('Getting pseudonym change events...')
     events = pseudonym_change_events(dataframe, pseudonyms, diff_speed, diff_heading)
     original_pos = events[['pos.x','pos.y']].values
-<<<<<<< HEAD:tracker.py
-    # print(original_pos)
-=======
     logging.debug(f"Original positions:\n----\n{original_pos}\n----\n")
->>>>>>> 68f3dc914696c65b381aeb2e3210888c3f61282a:scripts/tracker.py
 
     logging.info('Applying differential privacy to position data...')
     events = apply_differential_privacy('pos.x', 'pos.y', events, diff_position)
     
     # calculate distance between original and noised coordinates
     new_pos = events[['pos.x','pos.y']].values
-<<<<<<< HEAD:tracker.py
-    # print(new_pos)
-    position_noise = np.linalg.norm(new_pos - original_pos, axis=1)
-    # print(np.mean(position_noise))
-=======
     logging.debug(f"New positions:\n----\n{new_pos}\n----\n")
 
+    # t+1 transformation w/ noise 
+
     position_noise = np.linalg.norm(new_pos - original_pos, axis=1)
 
+
     logging.debug(f"Mean positional noise: {np.mean(position_noise)}")
->>>>>>> 68f3dc914696c65b381aeb2e3210888c3f61282a:scripts/tracker.py
 
     logging.info('Checking for local pseudonym change...')
     beacon_interval = 1/freq
@@ -539,6 +537,7 @@ def main(base_folder, freq, policy, dimensions, diff_speed, diff_position, diff_
         stdev,
         max_noise,
         min_noise
+        # TODO: mean uncertainty produced by noise
     ]
     results_file = '{}/run.csv'.format(exp_name)
     with open(results_file, 'w') as file:
