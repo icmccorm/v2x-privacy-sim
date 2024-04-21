@@ -158,12 +158,12 @@ def pseudonym_change_events(dataframe, pseudonyms, noise):
 
     assert previus_dim != actual_dim, 'DATA-FRAME NOT REDUCED'
 
-    # dataframe['angle'] = dataframe.apply(lambda row: heading_to_angle(row['heading.x'], row['heading.y']), axis=1)
-    # dataframe['angle'] = dataframe['angle'].apply(lambda x: x + noise.angle.sample(2*ANGLE_TOLERANCE, 2*ANGLE_TOLERANCE) % 360)
+    #dataframe['angle'] = dataframe.apply(lambda row: heading_to_angle(row['heading.x'], row['heading.y']), axis=1)
+    #dataframe['angle'] = dataframe['angle'].apply(lambda x: x + noise.angle.sample(2*ANGLE_TOLERANCE, 2*ANGLE_TOLERANCE) % 360)
     
-    # dataframe['speed'] = dataframe.apply(lambda row: np.sqrt(row['speed.x']**2 + row['speed.y']**2), axis=1)
-    # speed_range = np.ptp(dataframe['speed'])
-    # dataframe['speed'] = dataframe['speed'].apply(lambda x: x + noise.speed.sample(speed_range, speed_range))
+    #dataframe['speed'] = dataframe.apply(lambda row: np.sqrt(row['speed.x']**2 + row['speed.y']**2), axis=1)
+    #speed_range = np.ptp(dataframe['speed'])
+    #dataframe['speed'] = dataframe['speed'].apply(lambda x: x + noise.speed.sample(speed_range, speed_range))
     return dataframe
 
 def near(value1, value2, tolerance):
@@ -464,34 +464,33 @@ def analyze(path, freq, dimensions, noise):
     original_pos['distance'] = original_pos['speed'] * 5 # argbitrary time difference
     original_pos['pos.x2'] = original_pos['pos.x'] + (original_pos['distance'] * np.cos(original_pos['angle_rad']))
     original_pos['pos.y2'] = original_pos['pos.y'] + (original_pos['distance'] * np.sin(original_pos['angle_rad']))
-    # logging.debug(f"Original positions:\n----\n{original_pos}\n----\n")
+    logging.debug(f"Original positions:\n----\n{original_pos}\n----\n")
 
     logging.info('Applying differential privacy to data...')
-    for index, row in tqdm(dataframe.iterrows(), total=dataframe.shape[0], disable=disable_progress_bars()):
-        # positional noise
+    speed_range = np.ptp(events['speed'])
+
+    for index, row in tqdm(events.iterrows(), total=events.shape[0], disable=disable_progress_bars()):
         noise_x, noise_y = noise.position.sample()
+        noise_angle = noise.angle.sample(2*ANGLE_TOLERANCE, 2*ANGLE_TOLERANCE) % 360
+        noise_speed = noise.speed.sample(speed_range, speed_range)
         events.at[index, 'pos.x'] = events.at[index, 'pos.x'] + noise_x
         events.at[index, 'pos.y'] = events.at[index, 'pos.y'] + noise_y
-        # heading noise
-        events['angle'] = events['angle'].apply(lambda x: x + noise.angle.sample(2*ANGLE_TOLERANCE, 2*ANGLE_TOLERANCE) % 360)
-        # speed noise 
-        speed_range = np.ptp(events['speed'])
-        events['speed'] = events['speed'].apply(lambda x: x + noise.speed.sample(speed_range, speed_range))
+        events.at[index, 'angle'] = events.at[index, 'angle'] + noise_angle
+        events.at[index, 'speed'] = events.at[index, 'speed'] + noise_speed
 
-    # calculate distance between original and noised coordinates
+   # calculate distance between original and noised coordinates
     new_pos = events[['pos.x','pos.y','speed','angle']].copy()
     new_pos["angle_rad"] = list(map(lambda x: math.radians(x), new_pos["angle"]))
     new_pos['distance'] = new_pos['speed'] * 5 # argbitrary time difference
     new_pos['pos.x2'] = new_pos['pos.x'] + (new_pos['distance'] * np.cos(new_pos['angle_rad']))
     new_pos['pos.y2'] = new_pos['pos.y'] + (new_pos['distance'] * np.sin(new_pos['angle_rad']))
 
-    # logging.debug(f"New positions:\n----\n{new_pos}\n----\n")
+    logging.debug(f"New positions:\n----\n{new_pos}\n----\n")
 
-    # distance between un-noised and noised transformation 
+  #  distance between un-noised and noised transformation 
     diff_pos_transformation = np.linalg.norm(new_pos[['pos.x2', 'pos.y2']].values - original_pos[['pos.x2','pos.y2']].values, axis=1)
     diff_pos_transformation = np.mean(diff_pos_transformation)
-    print(new_pos)
-    print(original_pos)
+
     logging.debug(f"Mean positional noise: {np.mean(diff_pos_transformation)}")
 
     logging.info('Checking for local pseudonym change...')
@@ -505,8 +504,6 @@ def analyze(path, freq, dimensions, noise):
     precision, recall, f1_score = local_results(results, fn)
 
     return precision, recall, f1_score, diff_pos_transformation
-
-
 
 def main(base_folder, freq, policy, dimensions, noise, exp_name):
     """This function compose the complete path using the base_folder, freq and policy and check if the folder actually exist.
@@ -541,7 +538,6 @@ def main(base_folder, freq, policy, dimensions, noise, exp_name):
         recall,
         f1_score,
         diff_pos_transformation
-        # TODO: mean uncertainty produced by noise
     ]
     results_file = '{}/run.csv'.format(exp_name)
     print("========= results file: {} ============".format(results_file))
