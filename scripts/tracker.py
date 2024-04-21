@@ -11,8 +11,6 @@ import pandas as pd
 import numpy as np
 from tqdm import tqdm
 
-# position_budget,speed_budget,heading_budget,fq,pc,prec,recall,f1_score,noise_mean,noise_median,noise_stdev,noise_max,noise_min
-# a list of the strings above
 CSV_HEADERS = [
     'position_budget',
     'speed_budget', 
@@ -21,12 +19,7 @@ CSV_HEADERS = [
     'pc',
     'prec',
     'recall',
-    'f1_score',
-    'noise_mean',
-    'noise_median',
-    'noise_stdev',
-    'noise_max',
-    'noise_min'
+    'f1_score'
 ]
 
 class bcolors:
@@ -71,7 +64,8 @@ def apply_differential_privacy(x, y, dataframe, diff):
     dataframe : pandas.DataFrame
         The updated pandas DataFrame which include the new position columns with the laplacian noise applied
     """
-
+    dataframe[f"original.{x}"] = dataframe[x]
+    dataframe[f"original.{y}"] = dataframe[y]
     # iterate over each row using tqdm
     for index, row in tqdm(dataframe.iterrows(), total=dataframe.shape[0], disable=disable_progress_bars()):
         noise_x, noise_y = diff.sample()
@@ -81,7 +75,6 @@ def apply_differential_privacy(x, y, dataframe, diff):
         # noise apply
         dataframe.at[index, x] = dataframe.at[index, x] + noise_x
         dataframe.at[index, y] = dataframe.at[index, y] + noise_y
-        #dataframe.at[index, x], dataframe.at[index, y] = diff.apply_noise((row[x], row[y]))
         
     return dataframe
 
@@ -125,7 +118,7 @@ def mean_pseudonyms_change(path):
 
     return data, pseudonyms
 
-def pseudonym_change_events(dataframe, pseudonyms, diff_speed, diff_heading):
+def pseudonym_change_events(dataframe, pseudonyms, noise):
     """This function perform the following actions:
         - Labeling process of the dataset retrieving the entry and exit events of the pseudonyms.
         - Remove for each pseudonym all the unnecessary BSM between the entry.
@@ -165,12 +158,12 @@ def pseudonym_change_events(dataframe, pseudonyms, diff_speed, diff_heading):
 
     assert previus_dim != actual_dim, 'DATA-FRAME NOT REDUCED'
 
-    dataframe = apply_differential_privacy('heading.x', 'heading.y', dataframe, diff_heading)
-    dataframe['angle'] = dataframe.apply(lambda row: heading_to_angle(row['heading.x'], row['heading.y']), axis=1)
-
-    dataframe = apply_differential_privacy('speed.x', 'speed.y', dataframe, diff_speed)
-    dataframe['speed'] = dataframe.apply(lambda row: np.sqrt(row['speed.x']**2 + row['speed.y']**2), axis=1)
-
+    # dataframe['angle'] = dataframe.apply(lambda row: heading_to_angle(row['heading.x'], row['heading.y']), axis=1)
+    # dataframe['angle'] = dataframe['angle'].apply(lambda x: x + noise.angle.sample(2*ANGLE_TOLERANCE, 2*ANGLE_TOLERANCE) % 360)
+    
+    # dataframe['speed'] = dataframe.apply(lambda row: np.sqrt(row['speed.x']**2 + row['speed.y']**2), axis=1)
+    # speed_range = np.ptp(dataframe['speed'])
+    # dataframe['speed'] = dataframe['speed'].apply(lambda x: x + noise.speed.sample(speed_range, speed_range))
     return dataframe
 
 def near(value1, value2, tolerance):
@@ -327,7 +320,6 @@ def local_change(dataframe, pseudonyms, beacon_interval, results, dimensions=Fal
         
         last_seen = last_seen.iloc[0]
         last_seen_time = last_seen['t']
-        # last_seen_rsu = int(last_seen['rsu'])
 
         possible_match = dataframe.loc[(dataframe['event'] == 'e') | (dataframe['event'] == 'ex')]
         time_interval = possible_match['t'].between(last_seen_time, last_seen_time + beacon_interval + time_tolerance)
@@ -345,8 +337,6 @@ def local_change(dataframe, pseudonyms, beacon_interval, results, dimensions=Fal
         heading_filter = possible_match['angle'].between(last_seen['angle'] - ANGLE_TOLERANCE, last_seen['angle'] + ANGLE_TOLERANCE)
         possible_match = possible_match[heading_filter]
         
-        # possible_match = possible_match.loc[dataframe['rsu'] == last_seen_rsu]
-
         if not possible_match.empty:
             last_pos = np.array((last_seen['pos.x'], last_seen['pos.y'], 0))
             possible_match['distance'] = possible_match.apply(lambda row: np.linalg.norm(last_pos - np.array((row['pos.x'], row['pos.y'], 0))), axis=1)
@@ -431,7 +421,7 @@ def filter_dataframe(dataframe, pseudonyms):
     pseudonyms = np.delete(pseudonyms, to_remove_pseudonyms.astype(int))
     return pseudonyms
 
-def analyze(path, freq, dimensions, diff_speed, diff_position, diff_heading):
+def analyze(path, freq, dimensions, noise):
     """This function sequentially call all the function of the python script.
 
     Parameters
@@ -461,23 +451,48 @@ def analyze(path, freq, dimensions, diff_speed, diff_position, diff_heading):
     dataframe, pseudonyms = mean_pseudonyms_change(path)
 
     logging.info('Getting pseudonym change events...')
-    events = pseudonym_change_events(dataframe, pseudonyms, diff_speed, diff_heading)
-    original_pos = events[['pos.x','pos.y']].values
-    logging.debug(f"Original positions:\n----\n{original_pos}\n----\n")
-
-    logging.info('Applying differential privacy to position data...')
-    events = apply_differential_privacy('pos.x', 'pos.y', events, diff_position)
+    events = pseudonym_change_events(dataframe, pseudonyms, noise)
     
+    # apply heading to angle transform
+    events['angle'] = events.apply(lambda row: heading_to_angle(row['heading.x'], row['heading.y']), axis=1)
+
+    # apply speed (c2 = a2 + b2)
+    events['speed'] = events.apply(lambda row: np.sqrt(row['speed.x']**2 + row['speed.y']**2), axis=1)
+
+    original_pos = events[['pos.x','pos.y','speed','angle']].copy()
+    original_pos["angle_rad"] = list(map(lambda x: math.radians(x), original_pos["angle"]))
+    original_pos['distance'] = original_pos['speed'] * 5 # argbitrary time difference
+    original_pos['pos.x2'] = original_pos['pos.x'] + (original_pos['distance'] * np.cos(original_pos['angle_rad']))
+    original_pos['pos.y2'] = original_pos['pos.y'] + (original_pos['distance'] * np.sin(original_pos['angle_rad']))
+    # logging.debug(f"Original positions:\n----\n{original_pos}\n----\n")
+
+    logging.info('Applying differential privacy to data...')
+    for index, row in tqdm(dataframe.iterrows(), total=dataframe.shape[0], disable=disable_progress_bars()):
+        # positional noise
+        noise_x, noise_y = noise.position.sample()
+        events.at[index, 'pos.x'] = events.at[index, 'pos.x'] + noise_x
+        events.at[index, 'pos.y'] = events.at[index, 'pos.y'] + noise_y
+        # heading noise
+        events['angle'] = events['angle'].apply(lambda x: x + noise.angle.sample(2*ANGLE_TOLERANCE, 2*ANGLE_TOLERANCE) % 360)
+        # speed noise 
+        speed_range = np.ptp(events['speed'])
+        events['speed'] = events['speed'].apply(lambda x: x + noise.speed.sample(speed_range, speed_range))
+
     # calculate distance between original and noised coordinates
-    new_pos = events[['pos.x','pos.y']].values
-    logging.debug(f"New positions:\n----\n{new_pos}\n----\n")
+    new_pos = events[['pos.x','pos.y','speed','angle']].copy()
+    new_pos["angle_rad"] = list(map(lambda x: math.radians(x), new_pos["angle"]))
+    new_pos['distance'] = new_pos['speed'] * 5 # argbitrary time difference
+    new_pos['pos.x2'] = new_pos['pos.x'] + (new_pos['distance'] * np.cos(new_pos['angle_rad']))
+    new_pos['pos.y2'] = new_pos['pos.y'] + (new_pos['distance'] * np.sin(new_pos['angle_rad']))
 
-    # t+1 transformation w/ noise 
+    # logging.debug(f"New positions:\n----\n{new_pos}\n----\n")
 
-    position_noise = np.linalg.norm(new_pos - original_pos, axis=1)
-
-
-    logging.debug(f"Mean positional noise: {np.mean(position_noise)}")
+    # distance between un-noised and noised transformation 
+    diff_pos_transformation = np.linalg.norm(new_pos[['pos.x2', 'pos.y2']].values - original_pos[['pos.x2','pos.y2']].values, axis=1)
+    diff_pos_transformation = np.mean(diff_pos_transformation)
+    print(new_pos)
+    print(original_pos)
+    logging.debug(f"Mean positional noise: {np.mean(diff_pos_transformation)}")
 
     logging.info('Checking for local pseudonym change...')
     beacon_interval = 1/freq
@@ -489,11 +504,11 @@ def analyze(path, freq, dimensions, diff_speed, diff_position, diff_heading):
     fn = len(pseudonyms)
     precision, recall, f1_score = local_results(results, fn)
 
-    return precision, recall, f1_score, position_noise
+    return precision, recall, f1_score, diff_pos_transformation
 
 
 
-def main(base_folder, freq, policy, dimensions, diff_speed, diff_position, diff_heading, exp_name):
+def main(base_folder, freq, policy, dimensions, noise, exp_name):
     """This function compose the complete path using the base_folder, freq and policy and check if the folder actually exist.
 
     Parameters
@@ -514,32 +529,22 @@ def main(base_folder, freq, policy, dimensions, diff_speed, diff_position, diff_
     path = f'{base_folder}/fq_{freq}Hz/pc_{policy}'
     path_if_directory(path)
     logging.info(f'Analyze data in \'{path}\'')
-    
-    # retrieve classification results
-    precision, recall, f1_score, position_noise = analyze(path, freq, dimensions, diff_speed, diff_position, diff_heading)
-    mean = np.mean(position_noise)
-    median = np.median(position_noise)
-    stdev = np.std(position_noise)
-    max_noise = np.max(position_noise)
-    min_noise = np.min(position_noise)
 
+    precision, recall, f1_score, diff_pos_transformation = analyze(path, freq, dimensions, noise)
     results = [
-        diff_speed.budget,
-        diff_position.budget,
-        diff_heading.budget,
+        noise.speed.budget,
+        noise.position.budget,
+        noise.angle.budget,
         freq,
         policy,
         precision,
         recall,
         f1_score,
-        mean,
-        median,
-        stdev,
-        max_noise,
-        min_noise
+        diff_pos_transformation
         # TODO: mean uncertainty produced by noise
     ]
     results_file = '{}/run.csv'.format(exp_name)
+    print("========= results file: {} ============".format(results_file))
     with open(results_file, 'w') as file:
         file.write(",".join([str(r) for r in results]) + "\n")
     return None
@@ -590,12 +595,11 @@ if __name__ == "__main__":
     logging.basicConfig(filename="{}/run.log".format(exp_name), format=FORMAT, level=basic_level, datefmt='%d/%m/%y %H:%M:%S:%m')
     logging.disable(logging.ERROR if args.quiet else logging.NOTSET)
     os.environ["TQDM_DISABLE"] = str(int(args.quiet))
-    # positional noise
-    diff_position = diff.Positional(args.position_budget)
-    # speed noise
-    diff_speed = diff.Positional(args.speed_budget)
-    # heading noise
-    diff_heading = diff.Arbitrary(args.heading_budget, 2 * np.pi)
-    # main
+
+    noise = diff.NoiseMachine(args.position_budget, args.speed_budget, args.heading_budget)
+   
     main(args.directory, args.freq, args.policy, args.dimensions, 
-         diff_speed, diff_position, diff_heading, exp_name)
+         noise, exp_name)
+    
+
+

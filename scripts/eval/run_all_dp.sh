@@ -3,6 +3,7 @@ PC_SCHEME=$1
 DP_VALUE=$2
 MODE=$3
 FREQ=$4
+
 declare PCS=( [1]="Periodical" [2]="Disposable" [3]="Distance" [4]="Random" [5]="Car2Car")
 declare MODES=( [1]="Position" [2]="Speed" [3]="Heading" [4]="All")
 echo -e "($DP_VALUE, $FREQ, ${PCS[$PC_SCHEME]}, ${MODES[$MODE]})"
