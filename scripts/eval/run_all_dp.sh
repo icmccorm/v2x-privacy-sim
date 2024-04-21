@@ -4,6 +4,7 @@ POSITIONAL_BUDGET=$2
 ARBITRARY_BUDGET=$3
 MODE=$4
 FREQ=$5
+
 declare PCS=( [1]="Periodical" [2]="Disposable" [3]="Distance" [4]="Random" [5]="Car2Car")
 declare MODES=( [1]="Position" [2]="Speed" [3]="Heading" [4]="All")
 echo -e "($POSITIONAL_BUDGET, $ARBITRARY_BUDGET, $FREQ, ${PCS[$PC_SCHEME]}, ${MODES[$MODE]})"
