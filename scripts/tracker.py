@@ -485,13 +485,11 @@ def analyze(path, freq, dimensions, noise):
     new_pos['pos.x2'] = new_pos['pos.x'] + (new_pos['distance'] * np.cos(new_pos['angle_rad']))
     new_pos['pos.y2'] = new_pos['pos.y'] + (new_pos['distance'] * np.sin(new_pos['angle_rad']))
 
-    # logging.debug(f"New positions:\n----\n{new_pos}\n----\n")
+    # logging.debug(f"New positions:\n----\n{new_pos}\n----\n")    
 
     # distance between un-noised and noised transformation 
     diff_pos_transformation = np.linalg.norm(new_pos[['pos.x2', 'pos.y2']].values - original_pos[['pos.x2','pos.y2']].values, axis=1)
     diff_pos_transformation = np.mean(diff_pos_transformation)
-    print(new_pos)
-    print(original_pos)
     logging.debug(f"Mean positional noise: {np.mean(diff_pos_transformation)}")
 
     logging.info('Checking for local pseudonym change...')
