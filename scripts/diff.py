@@ -31,7 +31,7 @@ def epsilon(epsilon_prime):
     return epsilon_prime + (1 / STEP_SIZE) *np.log((q + 2*np.exp(epsilon_prime*STEP_SIZE)) / (q - 2*np.exp(epsilon_prime*STEP_SIZE)))
 
 def find_max_value(original):
-    threshold = 1e-9
+    threshold = 1e-3
     lower_bound = 0
     upper_bound = original
     while upper_bound - lower_bound > threshold:
@@ -41,11 +41,13 @@ def find_max_value(original):
             lower_bound = midpoint
         else:
             upper_bound = midpoint
-    return lower_bound
+    return round(lower_bound, 3)
 
 class Positional():
     def __init__(self, budget):
-        self.budget = find_max_value(budget)
+        self.original_budget = budget
+        self.adjusted_budget = find_max_value(budget)
+        assert(self.adjusted_budget <= self.original_budget)
     def sample(self):
         """Applies laplacian noise to a cartesian coordinate for a given privacy budget.
 
@@ -65,10 +67,10 @@ class Positional():
             If the budget is negative
         """
 
-        if self.budget == 0: 
+        if self.adjusted_budget == 0: 
             return (0, 0)
         else:
-            r =  (-1 / self.budget) * (sp.special.lambertw((np.random.uniform() - 1) / np.e, k=-1) + 1)
+            r =  (-1 / self.adjusted_budget) * (sp.special.lambertw((np.random.uniform() - 1) / np.e, k=-1) + 1)
             theta = np.random.uniform() * 2 * np.pi
             np.clip(r.real, 0, RADIUS_FROM_CAR)
             x = r.real * np.cos(theta) 

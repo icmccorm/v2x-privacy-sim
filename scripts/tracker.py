@@ -529,7 +529,8 @@ def main(base_folder, freq, policy, dimensions, noise, exp_name):
     precision, recall, f1_score, diff_pos_transformation = analyze(path, freq, dimensions, noise)
     results = [
         noise.speed.budget,
-        noise.position.budget,
+        noise.position.original_budget,
+        noise.position.adjusted_budget,
         noise.angle.budget,
         freq,
         policy,
