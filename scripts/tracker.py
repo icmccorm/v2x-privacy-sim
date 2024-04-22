@@ -449,15 +449,14 @@ def analyze(path, freq, dimensions, noise):
     """
     logging.info('Pseudonym change mean...')
     dataframe, pseudonyms = mean_pseudonyms_change(path)
-
+    dataframe['speed'] = dataframe.apply(lambda row: np.sqrt(row['speed.x']**2 + row['speed.y']**2), axis=1)
+    speed_range = np.ptp(dataframe['speed'])
+    print(f"SPEED RANGE: {speed_range}")
     logging.info('Getting pseudonym change events...')
     events = pseudonym_change_events(dataframe, pseudonyms, noise)
     
     # apply heading to angle transform
     events['angle'] = events.apply(lambda row: heading_to_angle(row['heading.x'], row['heading.y']), axis=1)
-
-    # apply speed (c2 = a2 + b2)
-    events['speed'] = events.apply(lambda row: np.sqrt(row['speed.x']**2 + row['speed.y']**2), axis=1)
 
     original_pos = events[['pos.x','pos.y','speed','angle']].copy()
     original_pos["angle_rad"] = list(map(lambda x: math.radians(x), original_pos["angle"]))
@@ -467,7 +466,6 @@ def analyze(path, freq, dimensions, noise):
     logging.debug(f"Original positions:\n----\n{original_pos}\n----\n")
 
     logging.info('Applying differential privacy to data...')
-    speed_range = np.ptp(events['speed'])
 
     for index, row in tqdm(events.iterrows(), total=events.shape[0], disable=disable_progress_bars()):
         noise_x, noise_y = noise.position.sample()
@@ -489,7 +487,8 @@ def analyze(path, freq, dimensions, noise):
 
   #  distance between un-noised and noised transformation 
     diff_pos_transformation = np.linalg.norm(new_pos[['pos.x2', 'pos.y2']].values - original_pos[['pos.x2','pos.y2']].values, axis=1)
-    diff_pos_transformation = np.mean(diff_pos_transformation)
+    dpt_mean = np.mean(diff_pos_transformation)
+    dpt_max = np.max(diff_pos_transformation)
     logging.debug(f"Mean positional noise: {np.mean(diff_pos_transformation)}")
 
     logging.info('Checking for local pseudonym change...')
@@ -502,7 +501,7 @@ def analyze(path, freq, dimensions, noise):
     fn = len(pseudonyms)
     precision, recall, f1_score = local_results(results, fn)
 
-    return precision, recall, f1_score, diff_pos_transformation
+    return precision, recall, f1_score, dpt_mean, dpt_max
 
 def main(base_folder, freq, policy, dimensions, noise, exp_name):
     """This function compose the complete path using the base_folder, freq and policy and check if the folder actually exist.
@@ -526,7 +525,7 @@ def main(base_folder, freq, policy, dimensions, noise, exp_name):
     path_if_directory(path)
     logging.info(f'Analyze data in \'{path}\'')
 
-    precision, recall, f1_score, diff_pos_transformation = analyze(path, freq, dimensions, noise)
+    precision, recall, f1_score, dpt_mean, dpt_max = analyze(path, freq, dimensions, noise)
     results = [
         noise.speed.budget,
         noise.position.original_budget,
@@ -537,7 +536,8 @@ def main(base_folder, freq, policy, dimensions, noise, exp_name):
         precision,
         recall,
         f1_score,
-        diff_pos_transformation
+        dpt_mean,
+        dpt_max
     ]
     results_file = '{}/run.csv'.format(exp_name)
     print("========= results file: {} ============".format(results_file))
