@@ -7,3 +7,4 @@ temp.csv
 job_log/*
 exp_data/*
 **/*/.ipynb_checkpoints
+output/*

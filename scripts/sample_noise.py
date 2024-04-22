@@ -1,6 +1,7 @@
 import diff as diff
 import numpy as np
 import math
+import pandas as pd
 
 def distance(point_1, point_2):
     return np.sqrt((point_1[0] - point_2[0])**2 + (point_1[1] - point_2[1])**2)
@@ -58,9 +59,9 @@ BUDGET_TYPE = "positional"
 
 if __name__ == "__main__":
 
-    position = (0, 0)
-    heading = (0.212621, 0.977135) # random sample
-    speed = (0.16358310664810494, 0.3168009495830433) # ave from pc_1/rsu[0]
+    position = [0, 0]
+    heading = [0.212621, 0.977135] # random sample
+    speed = [0.16358310664810494, 0.3168009495830433] # ave from pc_1/rsu[0]
 
     # positional noise budget
     positional_range = np.arange(0.08, 8.08, 0.08)
@@ -76,24 +77,26 @@ if __name__ == "__main__":
     
     # for each element of epsilon 
     for budget_step in epsilon_zip:
-        # define noise given 
-        noise = init_NoiseMachine(eps_elem=budget_step, budget_type=BUDGET_TYPE)
+
         orig_pos = []
         noisy_pos = []        
-        # itera
-        for i in range(0, 10): # 1000
+        
+        # init noise machine
+        noise = init_NoiseMachine(eps_elem=budget_step, budget_type=BUDGET_TYPE)
+
+        for i in range(0, 1000):
             
             # take t+5 position using original data
             orig_angle = heading_to_angle(heading[0], heading[1])
             orig_rad = math.radians(orig_angle)
             orig_speed = np.sqrt(speed[0]**2 + speed[1]**2)
             orig_dist = orig_speed * 5 # arbitrary value
-            orig_heading_2 = (None,None)
+            orig_heading_2 = [None, None]
             orig_heading_2[0] = position[0] + (orig_dist * np.cos(orig_rad))
             orig_heading_2[1] = position[1] + (orig_dist * np.sin(orig_rad))
 
             # noisy values
-            noisy_position = (None, None)
+            noisy_position = [None, None]
             noisy_speed = None 
             noisy_angle = None
 
@@ -105,12 +108,12 @@ if __name__ == "__main__":
             noisy_angle = orig_angle + noise.angle.sample(2*ANGLE_TOLERANCE, 2*ANGLE_TOLERANCE) % 360
             noisy_rad = math.radians(noisy_angle)
             # speed noise 
-            speed_range = 32.38587899036572 # np.ptp(events['speed']) --> using full pc_1/rsu[0]bsm.csv
-            noisy_speed = orig_speed + noise.speed.sample(speed_range, speed_range)
+            speed_minmax_range = 32.38587899036572 # np.ptp(events['speed']) --> using full pc_1/rsu[0]bsm.csv
+            noisy_speed = orig_speed + noise.speed.sample(speed_minmax_range, speed_minmax_range)
             noisy_dist = noisy_speed * 5 # arbitrary value
 
             # take t+5 position using noisy data
-            noisy_position_2 = (None, None)
+            noisy_position_2 = [None, None]
             noisy_position_2[0] = noisy_position[0] + (noisy_dist * np.cos(noisy_rad))
             noisy_position_2[1] = noisy_position[1] + (noisy_dist * np.sin(noisy_rad))
 
@@ -118,7 +121,7 @@ if __name__ == "__main__":
             orig_pos.append(orig_heading_2)
             noisy_pos.append(noisy_position_2)
 
-        # measure distance between t+5 original vs. noisy data    
+        # measure distance between t+5 original vs. noisy data
         diff_pos_transformation = np.linalg.norm(np.array(noisy_pos) - np.array(orig_pos), axis=1)
         # mean
         diff_pos_mean = np.mean(diff_pos_transformation)
@@ -126,10 +129,15 @@ if __name__ == "__main__":
         # standard dev
         diff_pos_std = np.std(diff_pos_transformation)
         stddev_uncertainty.append(diff_pos_std)
-
-        print(diff_pos_mean)
-        break
-
+        
+    # write output 
+    output = pd.DataFrame({"positional":positional_range,
+                           "speed":speed_range,
+                           "heading":heading_range,
+                           "EV":average_uncertainty, 
+                           "StdDev":stddev_uncertainty})
+    # write output
+    output.to_csv("output/noise_sampling_{}.csv".format(BUDGET_TYPE), index=False)
 
 
     #         positional_budget = budget_step
