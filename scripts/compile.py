@@ -1,9 +1,14 @@
 import pandas as pd
 import os
+import sys
+# take three arguments
+if len(sys.argv) != 4:
+    print("Usage: python compile.py <base_positional> <step_positional> <step_arbitrary>")
+    sys.exit(1)
 
-base_positional = 0.8
-step_positional = 0.005
-step_arbitrary = 0.25
+base_positional = float(sys.argv[1])
+step_positional = float(sys.argv[2])
+step_arbitrary = float(sys.argv[3])
 
 results = pd.read_csv(os.path.join("./exp_data", "results.csv"))
 results = results.drop(columns=['adjusted_position_budget'])

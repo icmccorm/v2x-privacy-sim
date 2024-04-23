@@ -48,36 +48,6 @@ FILE_NAME = 'rsu[{num}]bsm.csv'
 def disable_progress_bars():
     return bool(int(os.environ.get('TQDM_DISABLE', 0)))
 
-def apply_differential_privacy(x, y, dataframe, diff):
-    """Applies laplacian noise to the position of each BSM in the dataframe.
-
-    Parameters
-    ----------
-    dataframe : pandas.DataFrame, required
-        The pandas dataframe which contains all the bsm eavesdropped by the antennas
-
-    budget : float, required
-        The budget of the laplacian noise
-        
-    Returns
-    -------
-    dataframe : pandas.DataFrame
-        The updated pandas DataFrame which include the new position columns with the laplacian noise applied
-    """
-    dataframe[f"original.{x}"] = dataframe[x]
-    dataframe[f"original.{y}"] = dataframe[y]
-    # iterate over each row using tqdm
-    for index, row in tqdm(dataframe.iterrows(), total=dataframe.shape[0], disable=disable_progress_bars()):
-        noise_x, noise_y = diff.sample()
-        # original points 
-        dataframe.at[index, "{}_orig".format(x)] = dataframe.at[index, x] + noise_x
-        dataframe.at[index, "{}_orig".format(y)] = dataframe.at[index, y] + noise_y
-        # noise apply
-        dataframe.at[index, x] = dataframe.at[index, x] + noise_x
-        dataframe.at[index, y] = dataframe.at[index, y] + noise_y
-        
-    return dataframe
-
 def mean_pseudonyms_change(path):
     """Merge all the data in the \'path\' and calculate the average pseudonyms changes.
 
@@ -157,19 +127,12 @@ def pseudonym_change_events(dataframe, pseudonyms, noise):
     actual_dim = len(dataframe)
 
     assert previus_dim != actual_dim, 'DATA-FRAME NOT REDUCED'
-
-    #dataframe['angle'] = dataframe.apply(lambda row: heading_to_angle(row['heading.x'], row['heading.y']), axis=1)
-    #dataframe['angle'] = dataframe['angle'].apply(lambda x: x + noise.angle.sample(2*ANGLE_TOLERANCE, 2*ANGLE_TOLERANCE) % 360)
-    
-    #dataframe['speed'] = dataframe.apply(lambda row: np.sqrt(row['speed.x']**2 + row['speed.y']**2), axis=1)
-    #speed_range = np.ptp(dataframe['speed'])
-    #dataframe['speed'] = dataframe['speed'].apply(lambda x: x + noise.speed.sample(speed_range, speed_range))
     return dataframe
 
 def near(value1, value2, tolerance):
     """Based on the tolerance input calculate if two value are near each other.
 
-
+    
     Parameters
     ----------
     value1 : double, required
@@ -187,10 +150,9 @@ def near(value1, value2, tolerance):
         True if the value1 is between value2 - tolerance and value2 + tolerance
         
     """
-    if value1 >= (value2 - tolerance) and value1 <= (value2 + tolerance):
-        return True
-    else:
-        return False
+    print(f"val1: {value1}, val2: {value2}, tol: {tolerance}")
+    return value1 >= (value2 - tolerance) and value1 <= (value2 + tolerance)
+
     
 def heading_to_angle(x_heading, y_heading):
     """Function which converts the two heading vector components to an angle measured in degrees (0° - 360°)
@@ -345,6 +307,7 @@ def local_change(dataframe, pseudonyms, beacon_interval, results, dimensions=Fal
             for k in range(len(possible_match)):
                 current = possible_match.iloc[k]
                 if near(last_seen['speed'] * (current['t'] - last_seen_time), current['distance'], 2):
+                    print("found matching speed:")
                     matched_idx = possible_match.iloc[k:k+1].index.values.astype(int)[0]
                     dataframe, to_remove_pseudonyms = possible_candidate_found(dataframe, matched_idx, last_seen, results, pseudonyms, to_remove_pseudonyms)
                     break
@@ -451,7 +414,6 @@ def analyze(path, freq, dimensions, noise):
     dataframe, pseudonyms = mean_pseudonyms_change(path)
     dataframe['speed'] = dataframe.apply(lambda row: np.sqrt(row['speed.x']**2 + row['speed.y']**2), axis=1)
     speed_range = np.ptp(dataframe['speed'])
-    print(f"SPEED RANGE: {speed_range}")
     logging.info('Getting pseudonym change events...')
     events = pseudonym_change_events(dataframe, pseudonyms, noise)
     
@@ -460,7 +422,7 @@ def analyze(path, freq, dimensions, noise):
 
     original_pos = events[['pos.x','pos.y','speed','angle']].copy()
     original_pos["angle_rad"] = list(map(lambda x: math.radians(x), original_pos["angle"]))
-    original_pos['distance'] = original_pos['speed'] * 5 # argbitrary time difference
+    original_pos['distance'] = original_pos['speed'] * freq
     original_pos['pos.x2'] = original_pos['pos.x'] + (original_pos['distance'] * np.cos(original_pos['angle_rad']))
     original_pos['pos.y2'] = original_pos['pos.y'] + (original_pos['distance'] * np.sin(original_pos['angle_rad']))
     logging.debug(f"Original positions:\n----\n{original_pos}\n----\n")
@@ -471,6 +433,7 @@ def analyze(path, freq, dimensions, noise):
         noise_x, noise_y = noise.position.sample()
         noise_angle = noise.angle.sample(2*ANGLE_TOLERANCE, 2*ANGLE_TOLERANCE) % 360
         noise_speed = noise.speed.sample(speed_range, speed_range)
+        print(noise_speed)
         events.at[index, 'pos.x'] = events.at[index, 'pos.x'] + noise_x
         events.at[index, 'pos.y'] = events.at[index, 'pos.y'] + noise_y
         events.at[index, 'angle'] = events.at[index, 'angle'] + noise_angle
@@ -479,7 +442,7 @@ def analyze(path, freq, dimensions, noise):
    # calculate distance between original and noised coordinates
     new_pos = events[['pos.x','pos.y','speed','angle']].copy()
     new_pos["angle_rad"] = list(map(lambda x: math.radians(x), new_pos["angle"]))
-    new_pos['distance'] = new_pos['speed'] * 5 # argbitrary time difference
+    new_pos['distance'] = new_pos['speed'] * freq
     new_pos['pos.x2'] = new_pos['pos.x'] + (new_pos['distance'] * np.cos(new_pos['angle_rad']))
     new_pos['pos.y2'] = new_pos['pos.y'] + (new_pos['distance'] * np.sin(new_pos['angle_rad']))
 

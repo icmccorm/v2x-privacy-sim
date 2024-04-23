@@ -3,4 +3,4 @@ eval-dp:
 eval:
 	@./scripts/eval/run_all.sh
 test:
-	@python3 ./scripts/tracker.py -fq 1 -pc 1 -pb 1 -hb 0.01 -sb 0.01 --dir data
+	@python3 ./scripts/tracker.py -fq 1 -pc 1 -sb 0.00001 --debug --dir data

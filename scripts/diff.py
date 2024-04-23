@@ -19,7 +19,8 @@ class Arbitrary():
             raise ValueError("Budget must be non-negative")
         else:
             b = sensitivity / self.budget
-            return np.clip(np.random.laplace(scale = b), -bound, bound)
+            print(b)
+            return np.random.laplace(scale = b)
 
 RADIUS_FROM_CAR = 100
 MAX_DISTANCE_BETWEEN_POINTS = RADIUS_FROM_CAR * 2
