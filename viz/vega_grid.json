@@ -1,39 +1,51 @@
 {
-    "width": 150,
-    "height": 100,
-    "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
-    "data": {
-      "url": "https://gist.githubusercontent.com/icmccorm/50b475455daa97d1fbb1d24af40a9393/raw/635e648e063a6861de5f87cb44901f0a402716cb/data.csv"
+  "width": 140,
+  "height": 100,
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "data": {
+    "url": "https://gist.githubusercontent.com/icmccorm/50b475455daa97d1fbb1d24af40a9393/raw/635e648e063a6861de5f87cb44901f0a402716cb/data.csv"
+  },
+  "mark": {
+    "type": "line",
+    "clip": true
+  },
+  "encoding": {
+    "x": {
+      "field": "budget_step",
+      "type": "quantitative",
+      "scale": {
+        "domainMin": 0
+      },
+      "axis": {
+        "title": "Budget Step",
+        "titleFontSize": 12,
+        "labelFontSize": 12
+      }
     },
-    "mark": {
-      "type": "line",
-      "clip": true
+    "y": {
+      "field": "f1_score",
+      "type": "quantitative",
+      "axis": {
+        "title": "F1 Score",
+        "titleFontSize": 12,
+        "labelFontSize": 12
+      }
     },
-    "encoding": {
-      "x": {
-        "field": "budget_step",
-        "type": "quantitative",
-        "scale": {
-          "domainMin": 0
-        },
-        "axis": {
-          "title": "Budget Step"
-        }
-      },
-      "y": {
-        "field": "f1_score",
-        "type": "quantitative",
-        "axis": {
-          "title": "F1 Score"
-        }
-      },
-      "row": {
-        "field": "mode",
-        "title": "Privacy Mode"
-      },
-      "column": {
-        "field": "pc",
-        "title": "Pseudonym Change Scheme"
+    "row": {
+      "field": "mode",
+      "title": "Privacy Mode",
+      "header": {
+        "titleFontSize": 18,
+        "labelFontSize": 16
+      }
+    },
+    "column": {
+      "field": "pc",
+      "title": "Pseudonym Change Scheme",
+      "header": {
+        "titleFontSize": 18,
+        "labelFontSize": 16
       }
     }
   }
+}
