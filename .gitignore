@@ -4,7 +4,9 @@ sandbox.*
 env
 __pycache__
 temp.csv
-job_log/*
-exp_data/*
+job_log
+exp_data
 **/*/.ipynb_checkpoints
-output/*
+output
+*.png
+*.pdf
