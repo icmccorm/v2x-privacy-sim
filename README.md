@@ -1,92 +1,84 @@
-# PTS - PSEUDONYMS TRACKING FRAMEWORK (VTC Fall 2023)
+# Evaluating Differential Privacy for Location Data in V2X Communication
 
-This is the official GitHub repository for the paper "Are VANETs pseudonyms effective? An experimental evaluation of pseudonym tracking in adversarial scenario", presented at VTC Fall 2023. The repository contains our code implementation and instructions on how to run the PTS framework.
+This GitHub repository contains our extension to the pseudonym tracking simulation used in [Zoccoli et al.'s paper](https://ieeexplore.ieee.org/document/10333561): "Are VANETs pseudonyms effective? An experimental evaluation of pseudonym tracking in adversarial scenario". Their original repository is available [here](https://github.com/GGZ8/PTF/tree/7156d10d2da4e3e8568d7a3b56551804281c4e7d). We modified their simulation to apply differential privacy to the heading, speed, and location of vehicles using [bounded laplacian noise](https://programming-dp.com/ch5.html) and [geo-indistinguishability](https://arxiv.org/pdf/1212.1984) methods. 
 
-To perform our simulation we use the VM offered by [VEINS](https://veins.car2x.org/) extending it by installing [F2MD](https://github.com/josephkamel/F2MD) framework. We simulate the attacker antennas using the RSU dislocated over the [MASA](https://www.automotivesmartarea.it/) scenario.
+# Setup
+We used Python [3.9.9](https://www.python.org/downloads/release/python-399/), and our dependencies are specified in the provided [requirements.txt](https://github.com/icmccorm/v2x-privacy-sim/blob/main/requirements.txt) file. 
+```bash
+python3 -m venv env
+source env/bin/activate
+pip3 install -r requirements.txt
+```
+After configuring a virtual environment, to test the framework, you will need to download the output from Zoccoli et al.'s simulation, which is a compressed archive named [simulation_output.tgz](https://github.com/GGZ8/PTF/blob/7156d10d2da4e3e8568d7a3b56551804281c4e7d/simulation_output.tgz). Decompress the archive and ensure that its output `data` directory is present in the root folder of the repository. 
+```bash
+wget https://github.com/SECloudUNIMORE/ACS/raw/master/PTS/simulation_output.tgz
+tar xzf simulation_output.tgz
+```    
+Alternatively, you can build our Docker image, which performs each of the previous steps automatically. Equivalent instructions are also present in the README for the [original repository](https://github.com/GGZ8/PTF/tree/7156d10d2da4e3e8568d7a3b56551804281c4e7d). 
 
-## Execution of the PTF
-To test our framework we provide the output of one simulation which is stored in a compressed archive named `simulation_output.tgz`.\
-The data obtained from the simulation must respect the following constrains:
+# Execution
+You can execute a single iteration of the simulation using the following command:
+```bash
+python3 tracker.py -dir data/ -fq 1 -pc 1 -pb 0.1 -sb 0.1 -hb 0.1
+```
+Or alternatively, use `make test`. 
 
-- each antenna have to store the eavesdropped messages in a comma separated values (CSV) file, whose name can be defined in the python file named `tracker.py` at line 36. The default is `rsu[{antenna_num}]bsm.csv`.
-- the resulting csv output include some mandatory columns, while others are optional.
-    
-    **Mandatory**:
-    ```
-    t, realID, pseudonym, pos.x, pos.y, speed.x, speed.y, accel.x, accel.y, heading.x, heading.y
-    ```
-    Where *t* is the timestamp of message received, *pseudonym* is the pseudonym of the message, *pos.x* and *pos.y* are the two coordinates of the vehicles. While the latest six values representing kinematic values regarding the actual status of the vehicle sending the message.
-    In particular *speed*, *acceleration* and *heading* of the vehicle each divided into two columns representing the two (x,y) components of the vector.
+The following configuration options are available:
+```
+| Option  | Desc                                            |
+|---------|-------------------------------------------------|
+| -h      | Show the help message                           |
+| -q      | Disable logging                                 |
+| -d      | Enable debug logging                            |
+| -fq [f] | Specify the frequency. Only '1' is supported    |
+| -pc [p] | Specify the pseudonym change policy. (1-5)      |
+| -dim    | Consider dimensions when linking.               |
+| -pb [b] | Specify the privacy budget for position (>= 0). |
+| -sb [b] | Specify the privacy budget for speed (>=0).     |
+| -hb [b] | Specify the privacy budget for heading (>=0).   |
+```
+The following pseudonym change policies are supported:
+```
+| ID | Name       |
+|----|------------|
+| 1  | Periodical |
+| 2  | Disposable |
+| 3  | Distance   |
+| 4  | Random     |
+| 5  | Car2Car    |
+```
+Refer to the [original paper](https://ieeexplore.ieee.org/document/10333561) for detailed descriptions of each policy.
 
-    **Optional:**
-    ```
-    length, width
-    ```
-    Which correspond to the vehicles dimensions. Using the optional parameter `--dim` in the `tracker.py` to include the vehicles dimensions as filter .
+# Data Collection
+We conducted a large-scale evaluation of multiple combinations of pseudonym change policies and privacy budgets for speed, position, and heading. To recreate our results, you can execute the following command:
+```
+./scripts/eval/run_all_dp_in_parallel.sh 0.8 0.004 0.3
+```
 
+The first argument is the minimum value for the position budget. The second is the increment for the position budget and the third is the increment for the speed and heading budgets, which begin at 0. This difference is due to the clipping mechanim we use for positional noise, which Zoccoli et al. describe in section 4.3. This will execute 100 iterations of the simulation for each pseudonym change scheme and combination of differential privacy mechanisms at each of the increments. 
 
-To test our tracking framework follow these steps:
+Or alternatively, `make eval-dp`. This command launches up to 6 processes to run the simulation multiple times in parallel. This will create a folder `exp_data` with the following files:
+```
+- exp_data
+    |- results.csv
+    |- results_compiled.csv
+    |- err.log                  
+```
+The file `err.log` will contain all text written to `stderr` throughout the simulation. It should be empty after a successful run. The file `results.csv` contains the results of each execution. Every row is a single execution, with the following columns:
+```
+| Column                   | Desc                    |
+|--------------------------|-------------------------|
+| speed_budget             | Speed privacy budget    |
+| position_budget          | Position privacy budget |
+| adjusted_position_budget | See Zoccoli et al. 4.3  |
+| fq                       | Frequency               |
+| pc                       | Pseudonym change scheme |
+| prec                     | Precision               |
+| recall                   | Recall                  |
+| f1_score                 | F1 Score                |
+| dpt_mean                 | Mean change in position |
+| dpt_max                  | Max change in position  |
+```
+The file `results_compiled.csv` has equivalent contents, but they are lengthened to indicate whether noise is being applied to only one attribute or to each of speed, heading, and position. Noise values are also normalized as `budget_step` increments from 0 to 100, with zero indicating the minimum noise value and 100 indicating the maximum. 
 
-1. Create the python environment and install all the requirements.
-    
-    ```bash
-    python3 -m venv env
-    source env/bin/activate
-    pip3 install -r requirements.txt
-    ```
-
-2. Download the dataset
-    ```bash
-    wget https://github.com/SECloudUNIMORE/ACS/raw/master/PTS/simulation_output.tgz
-    ```
-
-2. Unzip the necessary file. 
-
-    ```bash
-    tar xzf simulation_output.tgz
-    ``` 
-    This command will unzip the one simulation output for the 1Hz frequency mentioned above.\
-    In particular the extraction process create the following directory tree structure:
-    ```
-    data
-    └── fq_1Hz
-        ├── pc_1
-        │   ├── rsu[0]bsm.csv
-        │   ├── rsu[1]bsm.csv
-        │   └── rsu[2]bsm.csv
-        ├── pc_2
-        │   ├── rsu[0]bsm.csv
-        │   ├── rsu[1]bsm.csv
-        │   └── rsu[2]bsm.csv
-        ├── pc_3
-        │   ├── rsu[0]bsm.csv
-        │   ├── rsu[1]bsm.csv
-        │   └── rsu[2]bsm.csv
-        ├── pc_4
-        │   ├── rsu[0]bsm.csv
-        │   ├── rsu[1]bsm.csv
-        │   └── rsu[2]bsm.csv
-        └── pc_5
-            ├── rsu[0]bsm.csv
-            ├── rsu[1]bsm.csv
-            └── rsu[2]bsm.csv
-    ```
-    Where 'pc' represent the PCS and the csv files contains all the message eavesdropped by the three antenna strategically dislocated in the scenario.
-    
-    **IMPORTANT:** The directory structure must reflect the one shown to ensure proper functioning of the PTS.
-
-3. Run the tracker framework considering a the first Pseudonyms Change Scheme(Periodical). Change 'pc' arguments for changing the PCS analyzed.
-
-    ```bash
-    python3 tracker.py -dir data/ -fq 1 -pc 1
-    ```
-
-    The output results: \
-    ![alt text](./docs/terminal_output.png "PTS OUTPUT")
-
-
-4. **OPTIONAL** To automatically run the tracking framework considering considering all the Pseudonyms Change Scheme (PCS) and the message frequency:
-
-    ```bash
-    bash run_all.sh
-    ```
+The results we use in our final report are provided in [results.zip](). 

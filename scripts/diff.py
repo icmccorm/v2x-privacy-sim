@@ -19,7 +19,6 @@ class Arbitrary():
             raise ValueError("Budget must be non-negative")
         else:
             b = sensitivity / self.budget
-            print(b)
             return np.random.laplace(scale = b)
 
 RADIUS_FROM_CAR = 100

@@ -431,7 +431,7 @@ def analyze(path, freq, dimensions, noise):
 
     for index, row in tqdm(events.iterrows(), total=events.shape[0], disable=disable_progress_bars()):
         noise_x, noise_y = noise.position.sample()
-        noise_angle = noise.angle.sample(2*ANGLE_TOLERANCE, 2*ANGLE_TOLERANCE) % 360
+        noise_angle = noise.angle.sample(2*ANGLE_TOLERANCE, 2*ANGLE_TOLERANCE)
         noise_speed = noise.speed.sample(speed_range, speed_range)
         print(noise_speed)
         events.at[index, 'pos.x'] = events.at[index, 'pos.x'] + noise_x
